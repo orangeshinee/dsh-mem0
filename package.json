@@ -67,5 +67,6 @@
     "schemastery": "^3.18.0",
     "typescript": "~5.7.2"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "pnpm@11.20.0"
 }
