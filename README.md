@@ -94,3 +94,7 @@ pnpm build       # 输出 lib/（ESM，源码在 src/）
 `node_modules` 解析。
 
 面向 AI agent 的开发说明（代码地图、平台陷阱、安全红线）见 [AGENTS.md](AGENTS.md)。
+
+## License
+
+[MIT](LICENSE)

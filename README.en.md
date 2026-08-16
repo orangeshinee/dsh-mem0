@@ -108,3 +108,7 @@ The build output is multi-file ESM (`tsc`); runtime dependencies
 
 For agent-oriented development notes (code map, platform traps, security red
 lines), see [AGENTS.md](AGENTS.md).
+
+## License
+
+[MIT](LICENSE)
