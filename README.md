@@ -4,8 +4,8 @@
 `mem0_*` 工具直接读写你自己的 mem0 REST 服务（新版 OSS 构建，`mem0/mem0-api-server`，
 带 dashboard，`X-API-Key` 认证，端点无 `/v1` 前缀）。
 
-热插拔：通过 `dsh plugin add link:<本目录>` 挂载，不改 dsh 源码。无浏览器端（只做
-Agent 工具，无侧边栏 UI）。
+热插拔：通过 `dsh plugin add link:<本目录>` 挂载，不改 dsh 源码。无侧边栏 UI，但带一个
+浏览器端：在设置面板 → 插件 → 插件配置里提供 `dsh-mem0` 配置卡片（编辑下面的配置项）。
 
 ## 工具
 
@@ -34,7 +34,7 @@ dsh plugin --profile web add link:$(pwd)
 
 ## 配置
 
-设置面板 → 插件配置 → `dsh-mem0`（或插件构成里的 config 段）：
+设置面板 → 插件 → 插件配置 → `dsh-mem0`（或插件构成里的 config 段）：
 
 | 键 | 默认 | 说明 |
 |---|---|---|
@@ -49,6 +49,9 @@ dsh plugin --profile web add link:$(pwd)
 
 配置经 dsh settings provider 持久化；`baseUrl` / `apiKey` / 默认标识符的修改即时生效，
 无需重启。
+
+> 插件配置卡片由浏览器端提供（`client/client.js`）。若升级后设置面板里看不到
+> `dsh-mem0` 卡片，重启一次 dsh web 进程并刷新页面——浏览器端清单在进程启动时编排。
 
 ## 开发
 
