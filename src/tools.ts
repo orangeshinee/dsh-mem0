@@ -3,9 +3,18 @@
  * Every tool talks to the same REST client the plugin configures, so a
  * server + API key set once (settings section or config entry) is
  * immediately operable by any agent.
+ *
+ * Definitions are built WITHOUT the runtime `@deepseek-ai/dsh-tools` import:
+ * `parameters` / `output.schema` are already raw JSON Schema (equivalent to
+ * what `defineTool` would compile from the DSL), and `ctx.tools.register`
+ * accepts plain definitions. Keeping the runtime import would hard-depend on
+ * a package that is ALSO a harness bundle row (`tools`); a profile-hoisted
+ * copy then shadows the harness's, splitting the module-level
+ * TOOL_RUNTIME_SCHEDULER Symbol and breaking every tool call with
+ * "Cannot read properties of undefined (reading 'prepare')". See AGENTS.md.
  */
 
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { JsonValue } from '@deepseek-ai/dsh-session'
 import type { Mem0Config } from './config.js'
@@ -80,8 +89,8 @@ function renderHistoryEntry(entry: Mem0HistoryEntry, index: number): string {
 }
 
 /** The add tool: `POST /memories`. */
-export function mem0AddTool(client: Mem0Client, config: () => Mem0Config) {
-  return defineTool({
+export function mem0AddTool(client: Mem0Client, config: () => Mem0Config): ToolDefinition {
+  return {
     name: 'mem0_add',
     description:
       'Store new memories into the self-hosted mem0. Provide either a single message string (messages, role defaults to "user") ' +
@@ -89,39 +98,43 @@ export function mem0AddTool(client: Mem0Client, config: () => Mem0Config) {
       'Use mem0_search to find existing memories first when the same fact may already be stored. ' +
       'Triggers: 记住 / 记下来 / 写入 mem0 / save to mem0 / add memory / remember this.',
     parameters: {
-      messages: {
-        oneOf: [
-          { type: 'string', description: 'One message content (role defaults to "user").' },
-          {
-            type: 'array',
-            description: 'Chat-style messages to extract memories from.',
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                role: { type: 'string', required: true },
-                content: { type: 'string', required: true },
+      type: 'object',
+      properties: {
+        messages: {
+          oneOf: [
+            { type: 'string', description: 'One message content (role defaults to "user").' },
+            {
+              type: 'array',
+              description: 'Chat-style messages to extract memories from.',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  role: { type: 'string' },
+                  content: { type: 'string' },
+                },
+                required: ['role', 'content'],
               },
             },
-          },
-        ],
-        required: true,
-        description: 'Content to memorize: a string, or an array of {role, content} messages.',
+          ],
+          description: 'Content to memorize: a string, or an array of {role, content} messages.',
+        },
+        role: { type: 'string', description: 'Role for the single-string form (default "user").' },
+        user_id: { type: 'string', description: 'Scoped memory owner; defaults to plugin defaultUserId.' },
+        agent_id: { type: 'string', description: 'Agent-scoped memory owner; defaults to plugin defaultAgentId.' },
+        run_id: { type: 'string', description: 'Run-scoped identifier.' },
+        metadata: { type: 'object', additionalProperties: true, description: 'Arbitrary key/value metadata to attach.' },
+        infer: { type: 'boolean', description: 'Whether the server should infer facts automatically (default true).' },
       },
-      role: { type: 'string', description: 'Role for the single-string form (default "user").' },
-      user_id: { type: 'string', description: 'Scoped memory owner; defaults to plugin defaultUserId.' },
-      agent_id: { type: 'string', description: 'Agent-scoped memory owner; defaults to plugin defaultAgentId.' },
-      run_id: { type: 'string', description: 'Run-scoped identifier.' },
-      metadata: { type: 'object', additionalProperties: true, description: 'Arbitrary key/value metadata to attach.' },
-      infer: { type: 'boolean', description: 'Whether the server should infer facts automatically (default true).' },
+      required: ['messages'],
     },
     output: {
       schema: {
         type: 'object',
         additionalProperties: false,
         properties: {
-          ok: { type: 'boolean', required: true },
-          created: { type: 'integer', required: true },
+          ok: { type: 'boolean' },
+          created: { type: 'integer' },
           results: {
             type: 'array',
             items: {
@@ -135,6 +148,7 @@ export function mem0AddTool(client: Mem0Client, config: () => Mem0Config) {
           },
           error: { type: 'string' },
         },
+        required: ['ok', 'created'],
       },
       render: (_args, value: { ok: boolean; created?: number; results?: Array<{ id?: string; memory?: string }>; error?: string }) =>
         text(
@@ -173,32 +187,36 @@ export function mem0AddTool(client: Mem0Client, config: () => Mem0Config) {
         return failWith(error, { created: 0, results: [] })
       }
     },
-  })
+  }
 }
 
 /** The search tool: `POST /search`. */
-export function mem0SearchTool(client: Mem0Client, config: () => Mem0Config) {
-  return defineTool({
+export function mem0SearchTool(client: Mem0Client, config: () => Mem0Config): ToolDefinition {
+  return {
     name: 'mem0_search',
     description:
       'Semantic search over memories stored in the self-hosted mem0. Returns the closest memories with relevance scores. ' +
       'Search is scoped to user_id / agent_id / run_id (defaults from plugin config). ' +
       'Triggers: 搜索记忆 / 查一下我记住的 / search memory / recall from mem0 / 找记忆.',
     parameters: {
-      query: { type: 'string', required: true, description: 'The search query, natural language.' },
-      user_id: { type: 'string', description: 'Scope; defaults to plugin defaultUserId.' },
-      agent_id: { type: 'string', description: 'Scope; only applied when explicitly passed (queries do not fall back to the default agent_id, so memories without an agent stay visible).' },
-      run_id: { type: 'string', description: 'Run-scoped identifier.' },
-      top_k: { type: 'integer', description: 'Max results (server default 100).' },
-      threshold: { type: 'number', description: 'Minimum similarity score (0..1) to include a result.' },
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'The search query, natural language.' },
+        user_id: { type: 'string', description: 'Scope; defaults to plugin defaultUserId.' },
+        agent_id: { type: 'string', description: 'Scope; only applied when explicitly passed (queries do not fall back to the default agent_id, so memories without an agent stay visible).' },
+        run_id: { type: 'string', description: 'Run-scoped identifier.' },
+        top_k: { type: 'integer', description: 'Max results (server default 100).' },
+        threshold: { type: 'number', description: 'Minimum similarity score (0..1) to include a result.' },
+      },
+      required: ['query'],
     },
     output: {
       schema: {
         type: 'object',
         additionalProperties: false,
         properties: {
-          ok: { type: 'boolean', required: true },
-          count: { type: 'integer', required: true },
+          ok: { type: 'boolean' },
+          count: { type: 'integer' },
           results: {
             type: 'array',
             items: {
@@ -213,6 +231,7 @@ export function mem0SearchTool(client: Mem0Client, config: () => Mem0Config) {
           },
           error: { type: 'string' },
         },
+        required: ['ok', 'count'],
       },
       render: (args, value: { ok: boolean; count?: number; results?: Array<{ id?: string; memory?: string; score?: number }>; error?: string }) =>
         text(
@@ -235,12 +254,12 @@ export function mem0SearchTool(client: Mem0Client, config: () => Mem0Config) {
         return failWith(error, { count: 0, results: [] })
       }
     },
-  })
+  }
 }
 
 /** The read tool: `GET /memories` (list) and `GET /memories/{id}` (one). */
-export function mem0GetTool(client: Mem0Client, config: () => Mem0Config) {
-  return defineTool({
+export function mem0GetTool(client: Mem0Client, config: () => Mem0Config): ToolDefinition {
+  return {
     name: 'mem0_get',
     description:
       'Read memories from the self-hosted mem0. With id, returns that one memory; without id, lists memories ' +
@@ -248,21 +267,24 @@ export function mem0GetTool(client: Mem0Client, config: () => Mem0Config) {
       'across identifiers (including agent-only memories with no user_id; requires admin on the server). ' +
       'Triggers: 读取记忆 / 查看记忆 / get memory / list memories from mem0.',
     parameters: {
-      id: { type: 'string', description: 'A specific memory id (from mem0_search / mem0_get).' },
-      user_id: { type: 'string', description: 'Scope; defaults to plugin defaultUserId.' },
-      agent_id: { type: 'string', description: 'Scope; only applied when explicitly passed (queries do not fall back to the default agent_id, so memories without an agent stay visible).' },
-      run_id: { type: 'string', description: 'Run-scoped identifier.' },
-      top_k: { type: 'integer', description: 'Max rows when listing (server cap 1000).' },
-      all: { type: 'boolean', description: 'List all memories across identifiers (no default scoping; admin required).' },
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'A specific memory id (from mem0_search / mem0_get).' },
+        user_id: { type: 'string', description: 'Scope; defaults to plugin defaultUserId.' },
+        agent_id: { type: 'string', description: 'Scope; only applied when explicitly passed (queries do not fall back to the default agent_id, so memories without an agent stay visible).' },
+        run_id: { type: 'string', description: 'Run-scoped identifier.' },
+        top_k: { type: 'integer', description: 'Max rows when listing (server cap 1000).' },
+        all: { type: 'boolean', description: 'List all memories across identifiers (no default scoping; admin required).' },
+      },
     },
     output: {
       schema: {
         type: 'object',
         additionalProperties: false,
         properties: {
-          ok: { type: 'boolean', required: true },
+          ok: { type: 'boolean' },
           count: { type: 'integer' },
-          memory: { type: 'json' },
+          memory: {},
           results: {
             type: 'array',
             items: {
@@ -282,17 +304,20 @@ export function mem0GetTool(client: Mem0Client, config: () => Mem0Config) {
           },
           error: { type: 'string' },
         },
+        required: ['ok'],
       },
-      render: (args, value: { ok: boolean; count?: number; memory?: JsonValue | null; results?: Mem0Memory[]; error?: string }) =>
-        text(
-          value.ok
+      render: (args, value: JsonValue) => {
+        const v = value as { ok?: boolean; count?: number; memory?: JsonValue | null; results?: Mem0Memory[]; error?: string }
+        return text(
+          v.ok === true
             ? (args as { id?: string }).id
-              ? value.memory
-                ? renderMemory(value.memory as Mem0Memory)
+              ? v.memory
+                ? renderMemory(v.memory as Mem0Memory)
                 : 'memory not found'
-              : `${value.count ?? 0} memory/memories:\n${renderMemories(value.results)}`
-            : `mem0_get failed: ${value.error ?? 'unknown error'}`,
-        ),
+              : `${v.count ?? 0} memory/memories:\n${renderMemories(v.results)}`
+            : `mem0_get failed: ${v.error ?? 'unknown error'}`,
+        )
+      },
     },
     async execute(args: { id?: string; user_id?: string; agent_id?: string; run_id?: string; top_k?: number; all?: boolean }) {
       try {
@@ -310,31 +335,36 @@ export function mem0GetTool(client: Mem0Client, config: () => Mem0Config) {
         return failWith(error, { count: 0 })
       }
     },
-  })
+  }
 }
 
 /** The update tool: `PUT /memories/{id}`. */
-export function mem0UpdateTool(client: Mem0Client) {
-  return defineTool({
+export function mem0UpdateTool(client: Mem0Client): ToolDefinition {
+  return {
     name: 'mem0_update',
     description:
       'Update a stored memory in the self-hosted mem0 by id (use mem0_search or mem0_get to find the id first). ' +
       'Triggers: 更新记忆 / 修改记忆 / update memory / edit memory in mem0.',
     parameters: {
-      id: { type: 'string', required: true, description: 'The memory id to update.' },
-      text: { type: 'string', description: 'New text content for the memory.' },
-      metadata: { type: 'object', additionalProperties: true, description: 'Replace the memory metadata.' },
-      expiration_date: { type: 'string', description: 'Optional expiration timestamp (ISO 8601).' },
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The memory id to update.' },
+        text: { type: 'string', description: 'New text content for the memory.' },
+        metadata: { type: 'object', additionalProperties: true, description: 'Replace the memory metadata.' },
+        expiration_date: { type: 'string', description: 'Optional expiration timestamp (ISO 8601).' },
+      },
+      required: ['id'],
     },
     output: {
       schema: {
         type: 'object',
         additionalProperties: false,
         properties: {
-          ok: { type: 'boolean', required: true },
+          ok: { type: 'boolean' },
           message: { type: 'string' },
           error: { type: 'string' },
         },
+        required: ['ok'],
       },
       render: (args, value: { ok: boolean; message?: string; error?: string }) =>
         text(
@@ -362,25 +392,28 @@ export function mem0UpdateTool(client: Mem0Client) {
         return failure(error)
       }
     },
-  })
+  }
 }
 
 /** The delete tool: `DELETE /memories/{id}` or `DELETE /memories`. */
-export function mem0DeleteTool(client: Mem0Client, config: () => Mem0Config) {
-  return defineTool({
+export function mem0DeleteTool(client: Mem0Client, config: () => Mem0Config): ToolDefinition {
+  return {
     name: 'mem0_delete',
     description:
       'Delete memories from the self-hosted mem0. With id, deletes that one memory. Without id, deletes ALL memories of the ' +
       'resolved identifiers (user_id / agent_id / run_id) — requires confirm: "DELETE ALL" and an admin server role. ' +
       'Destructive: always confirm the target before calling. Triggers: 删除记忆 / delete memory / remove from mem0.',
     parameters: {
-      id: { type: 'string', description: 'Specific memory id to delete (from mem0_search / mem0_get).' },
-      user_id: { type: 'string', description: 'Scope for bulk delete; defaults to plugin defaultUserId.' },
-      agent_id: { type: 'string', description: 'Scope for bulk delete; only applied when explicitly passed (queries do not fall back to the default agent_id, so memories without an agent stay visible).' },
-      run_id: { type: 'string', description: 'Run-scoped identifier.' },
-      confirm: {
-        type: 'string',
-        description: 'Required for bulk delete (no id): must be exactly "DELETE ALL".',
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Specific memory id to delete (from mem0_search / mem0_get).' },
+        user_id: { type: 'string', description: 'Scope for bulk delete; defaults to plugin defaultUserId.' },
+        agent_id: { type: 'string', description: 'Scope for bulk delete; only applied when explicitly passed (queries do not fall back to the default agent_id, so memories without an agent stay visible).' },
+        run_id: { type: 'string', description: 'Run-scoped identifier.' },
+        confirm: {
+          type: 'string',
+          description: 'Required for bulk delete (no id): must be exactly "DELETE ALL".',
+        },
       },
     },
     output: {
@@ -388,10 +421,11 @@ export function mem0DeleteTool(client: Mem0Client, config: () => Mem0Config) {
         type: 'object',
         additionalProperties: false,
         properties: {
-          ok: { type: 'boolean', required: true },
+          ok: { type: 'boolean' },
           message: { type: 'string' },
           error: { type: 'string' },
         },
+        required: ['ok'],
       },
       render: (args, value: { ok: boolean; message?: string; error?: string }) =>
         text(
@@ -419,25 +453,29 @@ export function mem0DeleteTool(client: Mem0Client, config: () => Mem0Config) {
         return failure(error)
       }
     },
-  })
+  }
 }
 
 /** The history tool: `GET /memories/{id}/history`. */
-export function mem0HistoryTool(client: Mem0Client) {
-  return defineTool({
+export function mem0HistoryTool(client: Mem0Client): ToolDefinition {
+  return {
     name: 'mem0_history',
     description:
       'Show the edit history of one memory in the self-hosted mem0 (created_at, updated_at, previous values). ' +
       'Use mem0_search / mem0_get to find the id first. Triggers: 记忆历史 / history of memory.',
     parameters: {
-      id: { type: 'string', required: true, description: 'The memory id to inspect.' },
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The memory id to inspect.' },
+      },
+      required: ['id'],
     },
     output: {
       schema: {
         type: 'object',
         additionalProperties: false,
         properties: {
-          ok: { type: 'boolean', required: true },
+          ok: { type: 'boolean' },
           id: { type: 'string' },
           history: {
             type: 'array',
@@ -458,13 +496,16 @@ export function mem0HistoryTool(client: Mem0Client) {
           },
           error: { type: 'string' },
         },
+        required: ['ok'],
       },
-      render: (args, value: { ok: boolean; id?: string; history?: Mem0HistoryEntry[]; error?: string }) =>
-        text(
-          value.ok
-            ? `history of ${value.id ?? ''}:\n${(value.history ?? []).length === 0 ? 'no history' : value.history!.map((h, i) => renderHistoryEntry(h, i)).join('\n')}`
-            : `mem0_history failed: ${value.error ?? 'unknown error'}`,
-        ),
+      render: (args, value: JsonValue) => {
+        const v = value as { ok?: boolean; id?: string; history?: Mem0HistoryEntry[]; error?: string }
+        return text(
+          v.ok === true
+            ? `history of ${v.id ?? ''}:\n${(v.history ?? []).length === 0 ? 'no history' : v.history!.map((h, i) => renderHistoryEntry(h, i)).join('\n')}`
+            : `mem0_history failed: ${v.error ?? 'unknown error'}`,
+        )
+      },
     },
     async execute(args: { id: string }) {
       try {
@@ -474,28 +515,33 @@ export function mem0HistoryTool(client: Mem0Client) {
         return failure(error)
       }
     },
-  })
+  }
 }
 
 /** The reset tool: `POST /reset` (admin). */
-export function mem0ResetTool(client: Mem0Client) {
-  return defineTool({
+export function mem0ResetTool(client: Mem0Client): ToolDefinition {
+  return {
     name: 'mem0_reset',
     description:
       'Wipe ALL memories from the self-hosted mem0. Destructive and irreversible; requires admin server role ' +
       'and confirm: "RESET" exactly. Triggers: 清空记忆 / reset mem0.',
     parameters: {
-      confirm: { type: 'string', required: true, description: 'Must be exactly "RESET".' },
+      type: 'object',
+      properties: {
+        confirm: { type: 'string', description: 'Must be exactly "RESET".' },
+      },
+      required: ['confirm'],
     },
     output: {
       schema: {
         type: 'object',
         additionalProperties: false,
         properties: {
-          ok: { type: 'boolean', required: true },
+          ok: { type: 'boolean' },
           message: { type: 'string' },
           error: { type: 'string' },
         },
+        required: ['ok'],
       },
       render: (args, value: { ok: boolean; message?: string; error?: string }) =>
         text(
@@ -515,32 +561,36 @@ export function mem0ResetTool(client: Mem0Client) {
         return failure(error)
       }
     },
-  })
+  }
 }
 
 /** The status tool: health + auth + configuration check. */
-export function mem0StatusTool(client: Mem0Client) {
-  return defineTool({
+export function mem0StatusTool(client: Mem0Client): ToolDefinition {
+  return {
     name: 'mem0_status',
     description:
       'Check the self-hosted mem0 connection: server reachability, auth state (needs an apiKey), and the current ' +
       'server configuration. The API key itself is never printed. Triggers: mem0 状态 / check mem0 / mem0 健康检查.',
-    parameters: {},
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
     output: {
       schema: {
         type: 'object',
         additionalProperties: false,
         properties: {
-          ok: { type: 'boolean', required: true },
-          reachable: { type: 'boolean', required: true },
-          authenticated: { type: 'boolean', required: true },
+          ok: { type: 'boolean' },
+          reachable: { type: 'boolean' },
+          authenticated: { type: 'boolean' },
           setupStatus: {
             oneOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }],
           },
           authError: { type: 'string' },
-          configure: { type: 'json' },
+          configure: {},
           error: { type: 'string' },
         },
+        required: ['ok', 'reachable', 'authenticated'],
       },
       render: (_args, value: { ok: boolean; reachable?: boolean; authenticated?: boolean; setupStatus?: { needsSetup?: boolean } | null; authError?: string; configure?: JsonValue; error?: string }) => {
         if (!value.ok) return text(`mem0_status failed: ${value.error ?? 'unknown error'}`)
@@ -568,5 +618,5 @@ export function mem0StatusTool(client: Mem0Client) {
         return { ...failure(error), reachable: false, authenticated: false }
       }
     },
-  })
+  }
 }
