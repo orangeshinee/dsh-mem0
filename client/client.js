@@ -343,9 +343,15 @@ window.__ModuleLoader__.load({
           return { text: staged.text, configured: this.snapshot().apiKeyConfigured === true || staged.text.trim() !== '', overridden: false, invalid: false }
         }
         const write = staged.clear ? { kind: 'clear' } : spec.parse(staged.text)
+        // The badge means "a save would actually change something": a set only
+        // counts when the draft differs from the effective value (plan() skips
+        // identical drafts), a clear only when a stored override stands.
+        const overridden =
+          write !== undefined &&
+          (write.kind === 'clear' ? this.stored(field) : staged.text !== spec.format(this.valueOf(field)))
         return {
           text: staged.text,
-          overridden: write !== undefined && (write.kind === 'set' || (write.kind === 'clear' && this.stored(field))),
+          overridden,
           invalid: write === undefined,
         }
       }

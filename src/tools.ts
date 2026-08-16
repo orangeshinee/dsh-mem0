@@ -187,7 +187,7 @@ export function mem0SearchTool(client: Mem0Client, config: () => Mem0Config) {
     parameters: {
       query: { type: 'string', required: true, description: 'The search query, natural language.' },
       user_id: { type: 'string', description: 'Scope; defaults to plugin defaultUserId.' },
-      agent_id: { type: 'string', description: 'Scope; defaults to plugin defaultAgentId.' },
+      agent_id: { type: 'string', description: 'Scope; only applied when explicitly passed (queries do not fall back to the default agent_id, so memories without an agent stay visible).' },
       run_id: { type: 'string', description: 'Run-scoped identifier.' },
       top_k: { type: 'integer', description: 'Max results (server default 100).' },
       threshold: { type: 'number', description: 'Minimum similarity score (0..1) to include a result.' },
@@ -250,7 +250,7 @@ export function mem0GetTool(client: Mem0Client, config: () => Mem0Config) {
     parameters: {
       id: { type: 'string', description: 'A specific memory id (from mem0_search / mem0_get).' },
       user_id: { type: 'string', description: 'Scope; defaults to plugin defaultUserId.' },
-      agent_id: { type: 'string', description: 'Scope; defaults to plugin defaultAgentId.' },
+      agent_id: { type: 'string', description: 'Scope; only applied when explicitly passed (queries do not fall back to the default agent_id, so memories without an agent stay visible).' },
       run_id: { type: 'string', description: 'Run-scoped identifier.' },
       top_k: { type: 'integer', description: 'Max rows when listing (server cap 1000).' },
       all: { type: 'boolean', description: 'List all memories across identifiers (no default scoping; admin required).' },
@@ -350,7 +350,14 @@ export function mem0UpdateTool(client: Mem0Client) {
           metadata: args.metadata,
           expiration_date: args.expiration_date,
         })
-        return { ok: true, message: typeof response === 'object' && response && 'message' in response ? String((response as { message: unknown }).message) ?? '' : '' }
+        // String(undefined) would render the literal "undefined"; only carry a
+        // real string message when the server answered one.
+        let message = ''
+        if (typeof response === 'object' && response !== null && 'message' in response) {
+          const raw = (response as { message?: unknown }).message
+          if (typeof raw === 'string') message = raw
+        }
+        return { ok: true, message }
       } catch (error) {
         return failure(error)
       }
@@ -369,7 +376,7 @@ export function mem0DeleteTool(client: Mem0Client, config: () => Mem0Config) {
     parameters: {
       id: { type: 'string', description: 'Specific memory id to delete (from mem0_search / mem0_get).' },
       user_id: { type: 'string', description: 'Scope for bulk delete; defaults to plugin defaultUserId.' },
-      agent_id: { type: 'string', description: 'Scope for bulk delete; defaults to plugin defaultAgentId.' },
+      agent_id: { type: 'string', description: 'Scope for bulk delete; only applied when explicitly passed (queries do not fall back to the default agent_id, so memories without an agent stay visible).' },
       run_id: { type: 'string', description: 'Run-scoped identifier.' },
       confirm: {
         type: 'string',

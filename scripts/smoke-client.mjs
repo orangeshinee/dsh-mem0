@@ -185,9 +185,17 @@ assert.equal(state1.dirty, true)
 assert.equal(state1.baseUrl.text, 'http://192.0.2.1:59888')
 assert.equal(state1.baseUrl.overridden, true)
 
-// Typing the same value back is not dirty.
+// Typing the same value back is not dirty and shows no override badge.
 card.edit('baseUrl', 'http://127.0.0.1:8888')
 assert.equal(card.useMem0Card((s) => s).dirty, false, 'same value is not an edit')
+assert.equal(card.useMem0Card((s) => s).baseUrl.overridden, false, 'same value shows no override badge')
+
+// A staged clear over a stored override keeps the badge (it will be removed on save).
+card.resetField('baseUrl')
+const state1b = card.useMem0Card((s) => s)
+assert.equal(state1b.baseUrl.text, 'http://127.0.0.1:8888')
+assert.equal(state1b.baseUrl.overridden, false, 'clearing an un-stored field shows no badge')
+card.discard()
 
 // Invalid number blocks the save.
 card.edit('timeoutMs', 'abc')
