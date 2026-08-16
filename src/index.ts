@@ -15,7 +15,7 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import { Config, MEM0_SETTINGS_NAMESPACE, resolveConfig, type Mem0Config } from './config.js'
 import { Mem0Client } from './mem0-client.js'
-import { makeSettingsRoutes } from './settings-routes.js'
+import { makeSettingsRoutes, type WebRoute } from './settings-routes.js'
 import {
   mem0AddTool,
   mem0DeleteTool,
@@ -116,20 +116,25 @@ export function apply(ctx: Context, config?: Mem0Config): void {
 
   // /api/dsh-mem0/config — the settings card's read/write path. The harness
   // settings wire only exposes namespaces on its own allowlist, so the card
-  // talks to this plugin-owned route instead. Registered only when a web
-  // server is composed (plain CLI mounts just get the tools + prompt section).
-  // Loose get: this plugin activates early (minimal injects), before the
-  // webServer provider's fiber reaches ACTIVE, so a strict lookup misses it.
-  const webServer = ctx.get('webServer', false)
-  if (webServer !== undefined) {
+  // talks to this plugin-owned route instead. Register through the same
+  // scoped-inject mechanism as the settings section (rather than a plain
+  // ctx.get): it fires whenever the webserver becomes available, does not
+  // hard-depend on it (headless/CLI mounts simply never register), and does
+  // not rely on the `strict` flag of ctx.get, whose availability differs
+  // across dsh versions.
+  ctx.inject(['webServer'], (sctx) => {
+    // Inside the injected scope the webserver service is guaranteed ACTIVE,
+    // so even a strict get resolves it (and avoids the undeclared-property
+    // typing problem of `sctx.webServer`).
+    const webServer = sctx.get('webServer') as { register(route: WebRoute): () => void }
     const disposers = makeSettingsRoutes(ctx).map((route) => webServer.register(route))
-    ctx.effect(
+    sctx.effect(
       () => () => {
         for (const dispose of disposers) dispose()
       },
       'dsh-mem0: config routes',
     )
-  }
+  })
 
   // Initial registration from the composition entry (covers deployments with
   // no settings service, whose installSettingsSection never fires its hooks).

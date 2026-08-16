@@ -7,13 +7,23 @@ import { apply } from '../lib/index.js'
 
 const registeredTools = []
 const sections = []
+const registeredRoutes = []
 let effectsActive = 0
+
+/** Stub webserver the injected scope hands out for `get('webServer')`. */
+const webServerStub = {
+  register: (route) => {
+    registeredRoutes.push(`${route.kind} ${route.path}`)
+    return () => { const i = registeredRoutes.lastIndexOf(`${route.kind} ${route.path}`); if (i >= 0) registeredRoutes.splice(i, 1) }
+  },
+}
 
 const ctx = {
   fiber: { state: 'active' },
   get: () => undefined,
   inject: (deps, cb) =>
     cb({
+      get: (name) => (name === 'webServer' ? webServerStub : undefined),
       settings: {
         register: (ns, schema, opts) => ({
           get: () => ({ baseUrl: 'http://x', apiKey: '', authType: 'apiKey', defaultUserId: 'Tony', defaultAgentId: 'dsh-agent', timeoutMs: 1000, announceToAgent: true, enabled: true }),
@@ -47,7 +57,9 @@ const expected = ['mem0_add', 'mem0_search', 'mem0_get', 'mem0_update', 'mem0_de
 const missing = expected.filter((n) => !registeredTools.includes(n))
 console.log('registered tools:', registeredTools.join(', '))
 console.log('prompt sections:', sections.map((s) => `${s.name}@${s.order}`).join(', '))
+console.log('config routes:', registeredRoutes.join(', '))
 console.log('effects active:', effectsActive)
 if (missing.length > 0) { console.error('MISSING:', missing.join(', ')); process.exit(1) }
 if (sections.length !== 1 || sections[0].name !== 'plugin:dsh-mem0') { console.error('section mismatch'); process.exit(1) }
+if (registeredRoutes.length !== 1 || registeredRoutes[0] !== 'exact /api/dsh-mem0/config') { console.error('route mismatch'); process.exit(1) }
 console.log('OK: all 8 tools + announcement section registered')
