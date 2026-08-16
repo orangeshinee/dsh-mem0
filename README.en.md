@@ -70,14 +70,14 @@ section of the plugin row in the composition):
 Settings are persisted by the dsh settings provider; changes to `baseUrl` /
 `apiKey` / the default identifiers apply immediately, no restart needed.
 
-> The configuration card is served by the browser half (`client/client.js`)
+> The configuration card is served by the browser half (`client/client.cjs`)
 > and reads/writes the settings through the plugin-owned
 > `/api/dsh-mem0/config` route (`src/settings-routes.ts`) — the harness's
 > settings wire only exposes namespaces on its own allowlist, which a plugin
 > cannot extend. `apiKey` is marked `role('secret')` in the schema: the route
 > only sends a "configured / not configured" flag, the key literal never
 > reaches the browser. After changing host-side code (`src/`) you must
-> `pnpm build` and restart dsh web; a change to `client/client.js` alone only
+> `pnpm build` and restart dsh web; a change to `client/client.cjs` alone only
 > needs a page refresh.
 
 ## Development

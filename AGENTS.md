@@ -17,7 +17,7 @@ web 设置面板提供配置卡片。**硬约束：不修改 dsh/harness 源码*
 | `src/mem0-client.ts` | mem0 REST 客户端（每次请求读实时配置） | 宿主 |
 | `src/tools.ts` | 8 个 `mem0_*` 工具定义 | 宿主 |
 | `src/settings-routes.ts` | `/api/dsh-mem0/config` 路由（配置卡片的读写通道） | 宿主 |
-| `client/client.js` | 浏览器半边：设置面板配置卡片（**手写纯 JS bundle，非构建产物**） | 浏览器 |
+| `client/client.cjs` | 浏览器半边：设置面板配置卡片（**手写纯 JS bundle，非构建产物**） | 浏览器 |
 | `cordis.patch.yml` | 把插件行插入 web profile 清单 | 装配 |
 | `scripts/smoke-client.mjs` | 浏览器半边冒烟（VM + 假路由） | 测试 |
 | `scripts/smoke-routes.mjs` | 宿主路由冒烟（假 settings 服务） | 测试 |
@@ -34,7 +34,7 @@ pnpm smoke:apply    # 宿主 apply 冒烟：8 工具 + 提示段注册（scripts
 ```
 
 - 改了 `src/**` → `pnpm build`，且 **dsh web 进程要重启**才生效（宿主代码启动时加载）。
-- 只改了 `client/client.js` → 刷新页面即生效（该文件按请求现读，rev 仅作缓存破坏）。
+- 只改了 `client/client.cjs` → 刷新页面即生效（该文件按请求现读，rev 仅作缓存破坏）。
 - 改了 `package.json` 的 `dsh.client` 声明或新增路由 → 同样需要重启（启动时编排清单）。
 - 冒烟测试用假对象/VM，不碰真实 mem0 数据；`scripts/smoke.mjs` 才打真实实例（用独立
   `dsh-mem0-test` 用户并自清理）。
@@ -43,7 +43,7 @@ pnpm smoke:apply    # 宿主 apply 冒烟：8 工具 + 提示段注册（scripts
 
 - **宿主半边**（`src/`）注册设置命名空间（`installSettingsSection`）、8 个工具、系统提示段。
   工具经 `resolve()` 每次请求读实时配置 → 设置改动即时生效，无需重启。
-- **浏览器半边**（`client/client.js`）只做一件事：在设置面板注册 `settings.plugin.item`
+- **浏览器半边**（`client/client.cjs`）只做一件事：在设置面板注册 `settings.plugin.item`
   卡片。卡片不直接依赖宿主工具，只读写配置。
 - **配置通道**：卡片 → `GET/POST /api/dsh-mem0/config`（宿主路由）→ `ctx.settings` 服务。
   卡片内的 `RouteScope` 实现与官方 `settingsScope` 相同的 `getSnapshot/subscribe/set/unset`
@@ -61,7 +61,7 @@ pnpm smoke:apply    # 宿主 apply 冒烟：8 工具 + 提示段注册（scripts
    `undefined`，`ctx.get(name, false)`（loose）才拿得到。路由注册和路由内读 settings 都必须
    用 loose get。**未声明在 `inject` 里的服务用属性访问（`ctx.webServer`）会直接抛错**
    （"cannot get property without inject"）——要么声明进 inject，要么用 `ctx.get(name, false)`。
-3. **客户端 bundle 格式**。`client/client.js` 是 `window.__ModuleLoader__.load({ id:
+3. **客户端 bundle 格式**。`client/client.cjs` 是 `window.__ModuleLoader__.load({ id:
    'dsh-mem0', factory })` 格式的手写纯 JS（无 TS/JSX/import），factory 返回
    `{ apply, inject }`。只能 `require` 平台模块：`react`、
    `@deepseek-ai/dsh-client-runtime/client`（`createSnapshotStore`）。浏览器半边
@@ -111,5 +111,5 @@ pnpm smoke:apply    # 宿主 apply 冒烟：8 工具 + 提示段注册（scripts
 - 工具/路由的注册与释放都挂在 `ctx.effect` 上（可逆副作用），新增面同样处理。
 - 路由文件保持「每路径一个 handler + 方法内分派」的结构（对齐 `dsh-ssh` 的 route 家族）。
 - 提示词文案（`MEM0_GUIDANCE`）是中文，面向模型；改配置默认值时同步改 README 表格。
-- 宿主 `src/` 用 TS（`strict`）；浏览器 `client/client.js` 是纯 JS 且不参与类型检查——它的
+- 宿主 `src/` 用 TS（`strict`）；浏览器 `client/client.cjs` 是纯 JS 且不参与类型检查——它的
   回归保障是 `pnpm smoke:client`，别绕过。

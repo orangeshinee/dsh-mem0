@@ -60,11 +60,11 @@ dsh plugin --profile web add link:$(pwd)
 配置经 dsh settings provider 持久化；`baseUrl` / `apiKey` / 默认标识符的修改即时生效，
 无需重启。
 
-> 插件配置卡片由浏览器端提供（`client/client.js`），通过插件自带的
+> 插件配置卡片由浏览器端提供（`client/client.cjs`），通过插件自带的
 > `/api/dsh-mem0/config` 路由（`src/settings-routes.ts`）读写配置——harness 的
 > settings 线上通道只开放白名单内的命名空间，插件无法自行加入。`apiKey` 在 schema 上
 > 标记为 `role('secret')`：路由只下发「已配置/未配置」标记，密钥字面量不会进入浏览器。
-> 修改宿主端代码（`src/`）后需重新 `pnpm build` 并重启 dsh web；仅改 `client/client.js`
+> 修改宿主端代码（`src/`）后需重新 `pnpm build` 并重启 dsh web；仅改 `client/client.cjs`
 > 刷新页面即可。
 
 ## 开发

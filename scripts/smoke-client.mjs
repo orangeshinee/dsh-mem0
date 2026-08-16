@@ -1,5 +1,5 @@
 /**
- * Smoke test for the dsh-mem0 browser half (client/client.js).
+ * Smoke test for the dsh-mem0 browser half (client/client.cjs).
  *
  * Loads the bundle the way the dsh client module loader does — a Node VM with
  * a stub window.__ModuleLoader__ — then drives the settings card's staged form
@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import assert from 'node:assert/strict'
 
-const code = readFileSync(new URL('../client/client.js', import.meta.url), 'utf8')
+const code = readFileSync(new URL('../client/client.cjs', import.meta.url), 'utf8')
 
 let handoff
 const sandbox = {
