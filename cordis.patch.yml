@@ -1,0 +1,12 @@
+# dsh-mem0 bundle patch: inserts the host-side plugin row into the web
+# profile roster. Applied as a profile bundle layer (the `dsh.bundle.patch`
+# manifest field) over dsh-base; activate with
+#   dsh plugin --profile web add link:<path-to-this-package>
+#
+# The row is a bare plugin by package name: the node half (exports ".") runs
+# in the host process (mem0 REST client + agent tools + settings section).
+# This plugin ships no browser half, so there is no `dsh.client` declaration
+# in package.json.
+- insert:
+    - id: mem0
+      name: 'dsh-mem0'
