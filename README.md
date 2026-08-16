@@ -1,5 +1,7 @@
 # dsh-mem0
 
+中文 | [English](README.en.md)
+
 自托管 [mem0](https://github.com/mem0ai/mem0) 记忆读写的 dsh 插件：宿主 Agent 通过
 `mem0_*` 工具直接读写你自己的 mem0 REST 服务（新版 OSS 构建，`mem0/mem0-api-server`，
 带 dashboard，`X-API-Key` 认证，端点无 `/v1` 前缀）。
@@ -66,3 +68,5 @@ pnpm build       # 输出 lib/（ESM，源码在 src/）
 
 构建产物为多文件 ESM（`tsc`），运行时依赖（`@deepseek-ai/dsh-*`）从宿主 profile 的
 `node_modules` 解析。
+
+面向 AI agent 的开发说明（代码地图、平台陷阱、安全红线）见 [AGENTS.md](AGENTS.md)。
