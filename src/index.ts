@@ -3,16 +3,19 @@
  *
  * Host-side cordis plugin. Mounts a mem0 REST client configured through the
  * dsh settings section (baseUrl / apiKey / authType / default identifiers),
- * registers the mem0_* agent tools, and announces itself to agents via a
- * system-prompt section. No browser half ships with this plugin.
+ * registers the mem0_* agent tools, announces itself to agents via a
+ * system-prompt section, and serves the /api/dsh-mem0/config route family
+ * that the browser-half settings card reads and writes (the harness settings
+ * wire only exposes namespaces on its own allowlist).
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import { installSettingsSection } from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
-import { Config, resolveConfig, type Mem0Config } from './config.js'
+import { Config, MEM0_SETTINGS_NAMESPACE, resolveConfig, type Mem0Config } from './config.js'
 import { Mem0Client } from './mem0-client.js'
+import { makeSettingsRoutes } from './settings-routes.js'
 import {
   mem0AddTool,
   mem0DeleteTool,
@@ -30,12 +33,8 @@ export const name = 'mem0'
 /** Services required before the mem0 surfaces can mount. */
 export const inject = ['tools', 'systemPrompt']
 
-/**
- * Settings namespace of the mem0 capability — the section the web settings
- * surface edits. Spelled here rather than imported: no other half depends
- * on it (there is no browser half).
- */
-export const MEM0_SETTINGS_NAMESPACE = settingsNamespace('dsh-mem0')
+/** Settings namespace of the mem0 capability (the section the web settings surface edits). */
+export { MEM0_SETTINGS_NAMESPACE } from './config.js'
 
 /** Order of the announcement section within the tool-guidance band. */
 const SECTION_ORDER = 150
@@ -114,6 +113,21 @@ export function apply(ctx: Context, config?: Mem0Config): void {
     },
     onChange: sync,
   })
+
+  // /api/dsh-mem0/config — the settings card's read/write path. The harness
+  // settings wire only exposes namespaces on its own allowlist, so the card
+  // talks to this plugin-owned route instead. Registered only when a web
+  // server is composed (plain CLI mounts just get the tools + prompt section).
+  const webServer = ctx.get('webServer')
+  if (webServer !== undefined) {
+    const disposers = makeSettingsRoutes(ctx).map((route) => webServer.register(route))
+    ctx.effect(
+      () => () => {
+        for (const dispose of disposers) dispose()
+      },
+      'dsh-mem0: config routes',
+    )
+  }
 
   // Initial registration from the composition entry (covers deployments with
   // no settings service, whose installSettingsSection never fires its hooks).

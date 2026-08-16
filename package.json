@@ -22,10 +22,8 @@
     },
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-connection",
-        "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-api-remotes"
       ],
       "platform": "web"
@@ -42,7 +40,8 @@
     "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc --noEmit",
     "watch": "tsc -p tsconfig.build.json --watch",
-    "smoke:client": "node scripts/smoke-client.mjs"
+    "smoke:client": "node scripts/smoke-client.mjs",
+    "smoke:routes": "node scripts/smoke-routes.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",

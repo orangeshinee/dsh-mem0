@@ -4,6 +4,8 @@
  * dsh settings provider (no hand-rolled store file needed).
  */
 import z from 'schemastery';
+/** Settings namespace of the mem0 capability — the section the settings surface edits. */
+export declare const MEM0_SETTINGS_NAMESPACE: import("@deepseek-ai/dsh-settings").SettingsNamespace;
 /** Resolved runtime config (schema defaults applied by the loader). */
 export interface Mem0Config {
     /** Base URL of the self-hosted mem0 REST server (no trailing slash, no /v1). */

@@ -3,10 +3,10 @@
  *
  * Loads the bundle the way the dsh client module loader does — a Node VM with
  * a stub window.__ModuleLoader__ — then drives the settings card's staged form
- * against a fake settings scope and the apply() slot registration against a
- * stub client context. This is NOT a browser test: it proves the bundle
- * parses, registers, and that the form model stages/validates/writes without
- * the GUI. Run with: node scripts/smoke-client.mjs
+ * against an in-memory fake of the /api/dsh-mem0/config route and the apply()
+ * slot registration against a stub client context. This is NOT a browser test:
+ * it proves the bundle parses, registers, and that the form model
+ * stages/validates/writes without the GUI. Run with: node scripts/smoke-client.mjs
  */
 
 import { readFileSync } from 'node:fs'
@@ -37,41 +37,78 @@ function snapshotStore(init) {
   }
 }
 
-/** Fake settings scope: resolves like the Host transport, records writes. */
-function fakeScope(initial) {
+const DEFAULTS = {
+  baseUrl: 'http://127.0.0.1:8888',
+  apiKey: '',
+  authType: 'apiKey',
+  defaultUserId: 'HeTony',
+  defaultAgentId: 'dsh-agent',
+  timeoutMs: 15000,
+  announceToAgent: true,
+  enabled: true,
+}
+
+/**
+ * In-memory fake of the host route: holds a raw user section, resolves it over
+ * the defaults (schema defaults -> base -> user), and REDACTS the apiKey the
+ * way the host's describe({ redactSecrets: true }) view does.
+ */
+function fakeRouteServer() {
+  let user = {}
   const writes = []
-  let snapshot = {
-    status: 'ready',
-    value: { ...initial },
-    base: { ...initial },
-    user: {},
-    revision: 1,
-    writable: true,
-    mode: 'host',
+  const resolve = () => ({ ...DEFAULTS, ...user })
+  const view = () => {
+    const value = resolve()
+    const { apiKey, ...redacted } = value
+    return {
+      status: 'ready',
+      value: redacted,
+      base: { ...DEFAULTS },
+      user: { ...user },
+      writable: true,
+      revision: writes.length + 1,
+      apiKeyConfigured: Boolean(apiKey),
+    }
   }
-  const listeners = new Set()
-  const publish = () => { for (const fn of listeners) fn() }
   return {
-    getSnapshot: () => snapshot,
-    subscribe: (fn) => { listeners.add(fn); return () => listeners.delete(fn) },
-    async set(field, value) {
-      writes.push(['set', field, value])
-      snapshot = { ...snapshot, user: { ...snapshot.user, [field]: value }, value: { ...snapshot.value, [field]: value }, revision: snapshot.revision + 1 }
-      publish()
-    },
-    async unset(field) {
-      writes.push(['unset', field])
-      const user = { ...snapshot.user }
-      delete user[field]
-      const value = { ...snapshot.value }
-      if (field in snapshot.base) value[field] = snapshot.base[field]
-      else delete value[field]
-      snapshot = { ...snapshot, user, value, revision: snapshot.revision + 1 }
-      publish()
-    },
     writes,
+    async handle(method, path, body) {
+      assert.equal(path, '/api/dsh-mem0/config')
+      if (method === 'GET') return { ok: true, status: 200, body: view() }
+      if (method !== 'POST') return { ok: false, status: 405, body: { error: 'method not allowed' } }
+      const { set = {}, unset = [] } = body ?? {}
+      for (const [field, value] of Object.entries(set)) {
+        writes.push(['set', field, value])
+        user = { ...user, [field]: value }
+      }
+      for (const field of unset) {
+        writes.push(['unset', field])
+        const next = { ...user }
+        delete next[field]
+        user = next
+      }
+      return { ok: true, status: 200, body: view() }
+    },
   }
 }
+
+// Global fetch stub the bundle's RouteScope calls (classic-script bundle reads
+// the page global, which in the VM sandbox is `fetch` from the sandbox scope).
+const server = fakeRouteServer()
+sandbox.fetch = async (url, options = {}) => {
+  const method = options.method ?? 'GET'
+  const body = options.body ? JSON.parse(options.body) : undefined
+  const result = await server.handle(method, String(url), body)
+  return {
+    ok: result.ok,
+    status: result.status,
+    async json() {
+      return result.body
+    },
+  }
+}
+// RouteScope also reads `fetch` through the VM realm's global lookup.
+vm.runInContext('globalThis.fetch = fetch', sandbox)
 
 const factoryExports = handoff.factory((spec) => {
   switch (spec) {
@@ -87,33 +124,20 @@ const factoryExports = handoff.factory((spec) => {
 })
 
 assert.equal(typeof factoryExports.apply, 'function', 'bundle must export apply')
-assert.deepEqual([...factoryExports.inject], ['slots', 'locale', 'connection', 'remote', 'settingsScope'])
+assert.deepEqual([...factoryExports.inject], ['slots', 'locale', 'remote'])
 
-// ---------------------------------------------------------------- form model
+// ---------------------------------------------------------------- apply path
 
-const DEFAULTS = {
-  baseUrl: 'http://127.0.0.1:8888',
-  apiKey: '',
-  authType: 'apiKey',
-  defaultUserId: 'HeTony',
-  defaultAgentId: 'dsh-agent',
-  timeoutMs: 15000,
-  announceToAgent: true,
-  enabled: true,
-}
-
-const scope = fakeScope(DEFAULTS)
-
-// Reach the controller through the apply path with a stub client context.
 const localeRegs = []
 const slotRegs = []
+const remoteHandlers = []
 const stubCtx = {
   effect: (fn) => { const dispose = fn(); return () => dispose?.() },
   locale: {
     register: (ns, dicts) => { localeRegs.push([ns, dicts]); return () => {} },
   },
-  settingsScope: {
-    bind: (spec) => { assert.equal(spec.namespace, 'dsh-mem0'); return scope },
+  remote: {
+    $on: (event, handler) => { remoteHandlers.push([event, handler]); return () => {} },
   },
   slots: {
     inject: (_key, factory) => { const dispose = factory(); return () => dispose?.() },
@@ -123,6 +147,8 @@ const stubCtx = {
 factoryExports.apply(stubCtx)
 
 assert.deepEqual(localeRegs.map(([ns]) => ns), ['dsh-mem0'], 'locale dictionaries registered')
+assert.equal(remoteHandlers.length, 1, 'settings invalidation subscribed')
+assert.equal(remoteHandlers[0][0], 'settings/document-updated')
 assert.equal(slotRegs.length, 1, 'one settings card registered')
 const [cardOptions, CardComponent] = slotRegs[0]
 assert.equal(cardOptions.name, 'settings.plugin.item')
@@ -131,23 +157,26 @@ assert.equal(cardOptions.locale, 'dsh-mem0')
 assert.equal(typeof cardOptions.inject, 'function')
 assert.equal(typeof CardComponent, 'function')
 
+// The scope's initial load is async — wait for the card to become available.
 const rawCard = cardOptions.inject()
-// Mimic the slot renderer's bindInjectHooks: `hooks: { mem0Card: store }`
-// becomes `useMem0Card(selector)` on the component's injected props.
 const card = { ...rawCard }
 for (const [name, source] of Object.entries(rawCard.hooks)) {
   const hookName = `use${name[0].toUpperCase()}${name.slice(1)}`
   card[hookName] = (selector) => selector(source.getSnapshot())
 }
 delete card.hooks
+
+await new Promise((resolve) => setTimeout(resolve, 20))
 const state0 = card.useMem0Card((s) => s)
-assert.equal(state0.available, true)
+assert.equal(state0.available, true, 'scope reports ready from the route')
 assert.equal(state0.writable, true)
 assert.equal(state0.dirty, false)
 assert.equal(state0.baseUrl.text, 'http://127.0.0.1:8888')
 assert.equal(state0.authType.text, 'apiKey')
 assert.equal(state0.enabled.checked, true)
 assert.equal(state0.apiKey.configured, false, 'blank apiKey reports unconfigured')
+
+// ---------------------------------------------------------------- form model
 
 // Stage an edit and verify the draft + override mark.
 card.edit('baseUrl', 'http://***REMOVED***:59888')
@@ -164,17 +193,18 @@ assert.equal(card.useMem0Card((s) => s).dirty, false, 'same value is not an edit
 card.edit('timeoutMs', 'abc')
 const state2 = card.useMem0Card((s) => s)
 assert.equal(state2.invalid, true)
-assert.equal(scope.writes.length, 0, 'no writes before a valid save')
+assert.equal(server.writes.length, 0, 'no writes before a valid save')
 
 // Fix the number, add a bool toggle and a secret; save.
 card.edit('timeoutMs', '30000')
 card.toggle('announceToAgent', false)
 card.edit('apiKey', 'm0sk_smoke')
 await card.save()
+await new Promise((resolve) => setTimeout(resolve, 20))
 const state3 = card.useMem0Card((s) => s)
 assert.equal(state3.dirty, false, 'staged edits cleared after a landed save')
 assert.deepEqual(
-  scope.writes,
+  server.writes,
   [
     ['set', 'timeoutMs', 30000],
     ['set', 'announceToAgent', false],
@@ -183,11 +213,12 @@ assert.deepEqual(
   'save writes exactly the staged edits',
 )
 assert.equal(state3.apiKey.configured, true, 'saved key reports configured')
+assert.equal(state3.timeoutMs.text, '30000', 'read-back reflects the save')
 
 // A blank secret draft writes nothing.
 card.edit('apiKey', '   ')
 await card.save()
-assert.deepEqual(scope.writes.map((w) => w[1]), ['timeoutMs', 'announceToAgent', 'apiKey'], 'blank secret staged no write')
+assert.equal(server.writes.length, 3, 'blank secret staged no write')
 
 // Reset-to-default unsets the override.
 card.resetField('timeoutMs')
@@ -195,14 +226,16 @@ const state4 = card.useMem0Card((s) => s)
 assert.equal(state4.timeoutMs.text, '15000', 'reset shows the composition default')
 assert.equal(state4.timeoutMs.overridden, true, 'a stored override is marked for clearing')
 await card.save()
-assert.deepEqual(scope.writes.at(-1), ['unset', 'timeoutMs'], 'reset lands as an unset')
+await new Promise((resolve) => setTimeout(resolve, 20))
+assert.deepEqual(server.writes.at(-1), ['unset', 'timeoutMs'], 'reset lands as an unset')
+assert.equal(card.useMem0Card((s) => s).timeoutMs.text, '15000', 'cleared field reads the default')
 
 // Discard drops drafts without writing.
 card.edit('baseUrl', 'http://example.com')
 assert.equal(card.useMem0Card((s) => s).dirty, true)
 card.discard()
 assert.equal(card.useMem0Card((s) => s).dirty, false)
-assert.equal(scope.writes.at(-1)[0], 'unset', 'discard performed no write')
+assert.equal(server.writes.at(-1)[0], 'unset', 'discard performed no write')
 
 // Boolean toggle equal to the current value is not an edit.
 card.toggle('enabled', true)
@@ -212,4 +245,9 @@ assert.equal(card.useMem0Card((s) => s).dirty, false, 'toggling to the current v
 const rendered = CardComponent({ t: (key) => key, ...card, useMem0Card: card.useMem0Card })
 assert.ok(rendered !== null && rendered !== undefined, 'card component renders')
 
-console.log('smoke-client: ok — bundle loads, card registers, form stages/saves/discards correctly')
+// Settings invalidation reloads the scope.
+await remoteHandlers[0][1]('dsh-mem0')
+await new Promise((resolve) => setTimeout(resolve, 20))
+assert.equal(card.useMem0Card((s) => s).available, true, 'invalidation reloads the route view')
+
+console.log('smoke-client: ok — bundle loads, card registers, route scope stages/saves/discards correctly')

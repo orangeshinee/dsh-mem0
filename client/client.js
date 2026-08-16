@@ -3,10 +3,14 @@
  *
  * Registers the "dsh-mem0" configuration card into the Web settings panel:
  * 设置面板 → 插件 → 插件配置 (the official `settings.plugin.item` slot,
- * rendered by the ui-settings-plugins "configurable" tab). The card binds the
- * host-registered `dsh-mem0` settings namespace through the client settings
- * scope and edits its section (baseUrl / apiKey / authType / defaults /
- * timeout / announcement / enabled) with staged, revision-fenced writes.
+ * rendered by the ui-settings-plugins "configurable" tab).
+ *
+ * The card does NOT use the harness settings RPC: that wire only exposes
+ * namespaces on the harness's own allowlist, which a plugin cannot widen.
+ * Instead it reads/writes the host-registered `dsh-mem0` settings namespace
+ * through the plugin-owned /api/dsh-mem0/config route (see
+ * src/settings-routes.ts). The API key never rides the wire: the host
+ * redacts it and answers with a configured flag only.
  *
  * This file is the shipped bundle artifact: the dsh client module loader
  * serves it at /plugins/dsh-mem0/client.js and calls
@@ -32,6 +36,9 @@ window.__ModuleLoader__.load({
 
     /** Settings namespace this card edits (spelled, not imported — a client bundle must not depend on a Host package). */
     const NS = 'dsh-mem0'
+
+    /** The plugin-owned config route (mirrors CONFIG_ROUTE in src/settings-routes.ts). */
+    const CONFIG_ROUTE = '/api/dsh-mem0/config'
 
     // ---------------------------------------------------------------- locale
 
@@ -175,6 +182,89 @@ window.__ModuleLoader__.load({
     ]
 
     /**
+     * The unavailable snapshot shape (the route answered 404/503 or the
+     * namespace is not registered host-side — the card renders nothing).
+     */
+    function unavailableSnapshot() {
+      return {
+        status: 'unavailable',
+        value: undefined,
+        base: undefined,
+        user: undefined,
+        writable: false,
+        revision: undefined,
+        apiKeyConfigured: false,
+      }
+    }
+
+    /** Normalize one host route view into the scope snapshot Mem0Form reads. */
+    function normalizeView(view) {
+      if (typeof view !== 'object' || view === null) return unavailableSnapshot()
+      return {
+        status: view.status === 'ready' ? 'ready' : 'unavailable',
+        value: view.value,
+        base: view.base,
+        user: view.user,
+        writable: view.writable === true,
+        revision: typeof view.revision === 'number' ? view.revision : undefined,
+        apiKeyConfigured: view.apiKeyConfigured === true,
+      }
+    }
+
+    /**
+     * Fetch-backed scope over /api/dsh-mem0/config — the card's read/write
+     * path. Implements the same surface Mem0Form consumes (getSnapshot /
+     * subscribe / set / unset), so the form model and controller are shared
+     * with the settings-scope design; only the transport differs.
+     */
+    class RouteScope {
+      constructor() {
+        this.store = createSnapshotStore(unavailableSnapshot())
+      }
+
+      getSnapshot() {
+        return this.store.getSnapshot()
+      }
+
+      subscribe(listener) {
+        return this.store.subscribe(listener)
+      }
+
+      /** GET the redacted view. */
+      async load() {
+        try {
+          const response = await fetch(CONFIG_ROUTE, { headers: { accept: 'application/json' } })
+          if (!response.ok) {
+            this.store.set(unavailableSnapshot())
+            return
+          }
+          this.store.set(normalizeView(await response.json()))
+        } catch {
+          this.store.set(unavailableSnapshot())
+        }
+      }
+
+      /** POST one field write (or a clear) and re-publish the host view. */
+      async write(body) {
+        const response = await fetch(CONFIG_ROUTE, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (!response.ok) throw new Error(`config write failed: ${response.status}`)
+        this.store.set(normalizeView(await response.json()))
+      }
+
+      set(field, value) {
+        return this.write({ set: { [field]: value } })
+      }
+
+      unset(field) {
+        return this.write({ unset: [field] })
+      }
+    }
+
+    /**
      * Staged form over one settings namespace. The card shows the effective
      * value (user layer over composition base over schema default) and stages
      * what the user types; only Save turns a draft into a durable, revision-
@@ -242,7 +332,7 @@ window.__ModuleLoader__.load({
         const staged = this.staged.get(field)
         if (staged === undefined) {
           if (spec.kind === 'bool') return { checked: spec.format(this.valueOf(field)), overridden: this.stored(field), invalid: false }
-          if (spec.kind === 'secret') return { text: '', configured: Boolean(this.valueOf(field)), overridden: false, invalid: false }
+          if (spec.kind === 'secret') return { text: '', configured: this.snapshot().apiKeyConfigured === true, overridden: false, invalid: false }
           return { text: spec.format(this.valueOf(field)), overridden: this.stored(field), invalid: false }
         }
         if (spec.kind === 'bool') {
@@ -250,7 +340,7 @@ window.__ModuleLoader__.load({
           return { checked: staged.checked, overridden: staged.checked !== spec.format(this.valueOf(field)), invalid: false }
         }
         if (spec.kind === 'secret') {
-          return { text: staged.text, configured: Boolean(this.valueOf(field)) || staged.text.trim() !== '', overridden: false, invalid: false }
+          return { text: staged.text, configured: this.snapshot().apiKeyConfigured === true || staged.text.trim() !== '', overridden: false, invalid: false }
         }
         const write = staged.clear ? { kind: 'clear' } : spec.parse(staged.text)
         return {
@@ -706,8 +796,8 @@ window.__ModuleLoader__.load({
 
     // ------------------------------------------------------------------ apply
 
-    /** Required services (fiber inject waiting — slots, locale, and the settings transport must be up). */
-    const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope']
+    /** Required services: slots + locale for the card, remote for settings invalidation. */
+    const inject = ['slots', 'locale', 'remote']
 
     /**
      * Mount the dsh-mem0 configuration card. Failure policy mirrors the other
@@ -718,7 +808,18 @@ window.__ModuleLoader__.load({
     function apply(ctx) {
       try {
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-mem0: card dictionaries')
-        const controller = new Mem0CardController(ctx.settingsScope.bind({ namespace: NS }))
+        const scope = new RouteScope()
+        const controller = new Mem0CardController(scope)
+        scope.load()
+        // Live-sync: the host forwards settings/document-updated for every
+        // namespace, so an external edit (or another window's save) refreshes.
+        ctx.effect(
+          () =>
+            ctx.remote.$on('settings/document-updated', (namespace) => {
+              if (namespace === undefined || namespace === NS) scope.load()
+            }),
+          'dsh-mem0: settings invalidation',
+        )
         ctx.effect(
           () =>
             ctx.slots.inject('settings.plugin.item', () =>

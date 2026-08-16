@@ -5,6 +5,10 @@
  */
 
 import z from 'schemastery'
+import { settingsNamespace } from '@deepseek-ai/dsh-settings'
+
+/** Settings namespace of the mem0 capability — the section the settings surface edits. */
+export const MEM0_SETTINGS_NAMESPACE = settingsNamespace('dsh-mem0')
 
 /** Resolved runtime config (schema defaults applied by the loader). */
 export interface Mem0Config {
@@ -29,7 +33,9 @@ export interface Mem0Config {
 /** Schemastery schema, validated + persisted by the dsh settings provider. */
 export const Config: z<Mem0Config> = z.object({
   baseUrl: z.string().default('http://127.0.0.1:8888'),
-  apiKey: z.string().default(''),
+  // role('secret'): redacted from every wire surface (the config route serves
+  // only an apiKeyConfigured flag; the literal never reaches the browser).
+  apiKey: z.string().role('secret').default(''),
   authType: z
     .union([z.const('apiKey'), z.const('adminKey'), z.const('jwt'), z.const('none')])
     .default('apiKey'),
