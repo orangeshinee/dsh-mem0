@@ -79,8 +79,12 @@ export interface Mem0Memory {
   agent_id?: string
   run_id?: string
   hash?: string
+  /** Field the OSS server sets on serialized rows (always present on the new build). */
+  attributed_to?: string
+  /** Field the OSS server sets on serialized rows (present on newer rows). */
+  role?: string
   expiration_date?: string | null
-  metadata?: Record<string, JsonValue>
+  metadata?: Record<string, JsonValue> | null
   created_at?: string
   updated_at?: string
   /** Search result extra fields. */

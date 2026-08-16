@@ -14,7 +14,7 @@
  * "Cannot read properties of undefined (reading 'prepare')". See AGENTS.md.
  */
 
-import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
+import type { JsonSchemaNode, ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { JsonValue } from '@deepseek-ai/dsh-session'
 import type { Mem0Config } from './config.js'
@@ -86,6 +86,34 @@ function renderHistoryEntry(entry: Mem0HistoryEntry, index: number): string {
       ? `-> ${entry.new_memory ?? '(empty)'}`
       : `${entry.old_memory} -> ${entry.new_memory ?? '(empty)'}`
   return `${index + 1}. [${event}]${when}\n   ${change}`
+}
+
+/**
+ * Output schema for one serialized memory row, matching the OSS server's
+ * `_serialize_memory` shape (see Mem0Memory): the server emits hash /
+ * attributed_to / role / expiration_date and may return null for
+ * metadata / run_id / agent_id / created_at / updated_at on old rows.
+ * `additionalProperties: true` tolerates fields a newer OSS build adds —
+ * output validation must never reject a row the server actually returned.
+ */
+const MEMORY_ROW_SCHEMA: JsonSchemaNode = {
+  type: 'object',
+  additionalProperties: true,
+  properties: {
+    id: { type: 'string' },
+    memory: { type: 'string' },
+    user_id: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+    agent_id: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+    run_id: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+    hash: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+    attributed_to: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+    role: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+    expiration_date: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+    metadata: { oneOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] },
+    created_at: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+    updated_at: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+    score: { type: 'number' },
+  },
 }
 
 /** The add tool: `POST /memories`. */
@@ -219,15 +247,7 @@ export function mem0SearchTool(client: Mem0Client, config: () => Mem0Config): To
           count: { type: 'integer' },
           results: {
             type: 'array',
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                id: { type: 'string' },
-                memory: { type: 'string' },
-                score: { type: 'number' },
-              },
-            },
+            items: MEMORY_ROW_SCHEMA,
           },
           error: { type: 'string' },
         },
@@ -287,20 +307,7 @@ export function mem0GetTool(client: Mem0Client, config: () => Mem0Config): ToolD
           memory: {},
           results: {
             type: 'array',
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                id: { type: 'string' },
-                memory: { type: 'string' },
-                user_id: { type: 'string' },
-                agent_id: { type: 'string' },
-                run_id: { type: 'string' },
-                created_at: { type: 'string' },
-                updated_at: { type: 'string' },
-                metadata: { type: 'object', additionalProperties: true },
-              },
-            },
+            items: MEMORY_ROW_SCHEMA,
           },
           error: { type: 'string' },
         },
@@ -481,16 +488,18 @@ export function mem0HistoryTool(client: Mem0Client): ToolDefinition {
             type: 'array',
             items: {
               type: 'object',
-              additionalProperties: false,
+              additionalProperties: true,
               properties: {
-                id: { type: 'string' },
-                memory_id: { type: 'string' },
+                id: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+                memory_id: { oneOf: [{ type: 'string' }, { type: 'null' }] },
                 old_memory: { oneOf: [{ type: 'string' }, { type: 'null' }] },
                 new_memory: { oneOf: [{ type: 'string' }, { type: 'null' }] },
-                event: { type: 'string' },
-                created_at: { type: 'string' },
+                event: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+                created_at: { oneOf: [{ type: 'string' }, { type: 'null' }] },
                 updated_at: { oneOf: [{ type: 'string' }, { type: 'null' }] },
                 is_deleted: { type: 'boolean' },
+                actor_id: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+                role: { oneOf: [{ type: 'string' }, { type: 'null' }] },
               },
             },
           },

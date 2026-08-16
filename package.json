@@ -44,7 +44,8 @@
     "watch": "tsc -p tsconfig.build.json --watch",
     "smoke:client": "node scripts/smoke-client.mjs",
     "smoke:routes": "node scripts/smoke-routes.mjs",
-    "smoke:apply": "node scripts/load-test.mjs"
+    "smoke:apply": "node scripts/load-test.mjs",
+    "smoke:tools": "node scripts/smoke-tools.mjs"
   },
   "dependencies": {
     "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",

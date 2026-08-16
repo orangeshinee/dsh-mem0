@@ -31,6 +31,7 @@ pnpm build          # tsc 输出 lib/ + 类型检查（必须通过）
 pnpm smoke:client   # 浏览器半边：bundle 加载 + 表单暂存/保存/放弃
 pnpm smoke:routes   # 宿主路由：脱敏 / 字段白名单 / loopback 围栏 / set+unset
 pnpm smoke:apply    # 宿主 apply 冒烟：8 工具 + 提示段注册（scripts/load-test.mjs）
+pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷必须通过（scripts/smoke-tools.mjs）
 ```
 
 - 改了 `src/**` → `pnpm build`，且 **dsh web 进程要重启**才生效（宿主代码启动时加载）。
@@ -82,6 +83,13 @@ pnpm smoke:apply    # 宿主 apply 冒烟：8 工具 + 提示段注册（scripts
 - `GET /memories/{id}/history` 返回**裸数组**（不是 `{results:[]}`）。
 - 批量删除 / reset 需要 admin 角色 + 明确 confirm 词。
 - `mem0_get all=true` 跨标识符列举需要 admin key。
+- **序列化行（`_serialize_memory`）形状**：恒有 `hash` / `attributed_to`，新行有 `role`，
+  `expiration_date` 常以 null 存在，且 `metadata` / `run_id` / `agent_id` / `created_at` /
+  `updated_at` 在旧行上可能是 null。**工具输出 schema 必须容忍这些**（`MEMORY_ROW_SCHEMA`：
+  `additionalProperties:true` + 可空字段用 `oneOf:[{type:'x'},{type:'null'}]`）——严格 schema
+  会让整个读路径被 harness 的输出校验拦死（ToolOutputError「invalid output」）。回归保障：
+  `pnpm smoke:tools`。注意 dsh-tools 的 JSON Schema 子集**不支持 `type` 数组**（如
+  `['string','null']`），可空必须用 oneOf。
 
 ## 安全红线
 
