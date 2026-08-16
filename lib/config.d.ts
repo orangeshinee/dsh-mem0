@@ -3,7 +3,7 @@
  * values the mem0 REST client resolves on every request. Persisted by the
  * dsh settings provider (no hand-rolled store file needed).
  */
-import z from 'schemastery';
+import z from '@deepseek-ai/schemastery';
 /** Settings namespace of the mem0 capability — the section the settings surface edits. */
 export declare const MEM0_SETTINGS_NAMESPACE: import("@deepseek-ai/dsh-settings").SettingsNamespace;
 /** Resolved runtime config (schema defaults applied by the loader). */

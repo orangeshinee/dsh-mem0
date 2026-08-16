@@ -4,7 +4,7 @@
  * dsh settings provider (no hand-rolled store file needed).
  */
 
-import z from 'schemastery'
+import z from '@deepseek-ai/schemastery'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 
 /** Settings namespace of the mem0 capability — the section the settings surface edits. */
