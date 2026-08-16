@@ -21,7 +21,7 @@ web 设置面板提供配置卡片。**硬约束：不修改 dsh/harness 源码*
 | `cordis.patch.yml` | 把插件行插入 web profile 清单 | 装配 |
 | `scripts/smoke-client.mjs` | 浏览器半边冒烟（VM + 假路由） | 测试 |
 | `scripts/smoke-routes.mjs` | 宿主路由冒烟（假 settings 服务） | 测试 |
-| `scripts/smoke.mjs` / `load-test.mjs` / `migrate-user-id.mjs` | 真机 E2E / apply 冒烟 / 数据迁移（含真实凭据，见安全红线） | 测试 |
+| `scripts/smoke.mjs` / `load-test.mjs` / `migrate-user-id.mjs` | 真机 E2E / apply 冒烟 / 数据迁移（凭据走环境变量，见安全红线） | 测试 |
 | `lib/` | `pnpm build` 的 tsc 产物，**纳入 git**（link 挂载直接加载它） | 产物 |
 
 ## 构建与验证（每次改动必跑）
@@ -84,9 +84,12 @@ pnpm smoke:routes   # 宿主路由：脱敏 / 字段白名单 / loopback 围栏 
 
 ## 安全红线
 
-- **`scripts/smoke.mjs` / `migrate-user-id.mjs` 里硬编码了真实 apiKey 和服务器地址**（历史
-  遗留）。新脚本一律从环境变量/配置文件读，**不要再提交新密钥**。想清理的话把这两处改为
-  `process.env.MEM0_API_KEY` / `MEM0_BASE_URL` 再提交。
+- **凭据一律从环境变量读取，禁止硬编码**。真机脚本 `scripts/smoke.mjs` 和
+  `migrate-user-id.mjs` 需要 `MEM0_API_KEY` + `MEM0_BASE_URL`（缺失即退出并提示）；
+  `migrate-user-id.mjs` 是**重建+删除**的破坏性脚本，还额外要求 `MIGRATE_CONFIRM=yes`
+  才执行。本地可用 `.env` 存放这些值（已在 `.gitignore`），**任何密钥都不进 git**。
+- **旧 git 历史（`9cb7536` / `cfc85b8`）里仍有旧 apiKey 与内网地址，视为已泄露**——旧密钥
+  不要复用到别处，尽快在 mem0 dashboard 轮换。
 - 配置路由是 **loopback-only**（`isLoopbackRequest` 围栏，同源校验）——执行写入的端点不能
   对 LAN 开放。新增路由必须带同样的围栏。
 - 破坏性工具（删除/清空）先展示目标再执行，工具描述里已写明 confirm 要求，别弱化。

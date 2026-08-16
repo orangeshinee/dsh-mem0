@@ -7,10 +7,23 @@
  * content verbatim (no LLM extraction, no translation) — keeping the same
  * agent_id, then deletes the original row. Content is preserved 1:1; ids
  * and timestamps change.
+ *
+ * DESTRUCTIVE: this script rebuilds AND deletes records. It refuses to run
+ * without MEM0_API_KEY / MEM0_BASE_URL and an explicit MIGRATE_CONFIRM=yes.
  */
-const KEY = '***REMOVED***'
-const BASE = 'http://***REMOVED***:59888'
-const TARGET_USER = 'HeTony'
+
+const KEY = process.env.MEM0_API_KEY ?? ''
+const BASE = process.env.MEM0_BASE_URL ?? ''
+const TARGET_USER = process.env.MIGRATE_TARGET_USER ?? 'HeTony'
+
+if (!KEY || !BASE) {
+  console.error('refusing to run: set MEM0_API_KEY and MEM0_BASE_URL first (see AGENTS.md)')
+  process.exit(1)
+}
+if (process.env.MIGRATE_CONFIRM?.toLowerCase() !== 'yes') {
+  console.error('refusing to run: this script rebuilds and deletes records; set MIGRATE_CONFIRM=yes to proceed')
+  process.exit(1)
+}
 
 import('../lib/mem0-client.js').then(async ({ Mem0Client }) => {
   const c = new Mem0Client(() => ({ baseUrl: BASE, apiKey: KEY, authType: 'apiKey', timeoutMs: 30000 }))

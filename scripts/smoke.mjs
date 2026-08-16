@@ -2,10 +2,18 @@
  * End-to-end smoke test of the mem0 REST client against the real instance.
  * Uses a dedicated test user_id so real data (Tony / dsh-agent) is untouched.
  * Cleans up every memory it creates.
+ *
+ * Requires MEM0_API_KEY / MEM0_BASE_URL (see AGENTS.md); refuses to run
+ * against a live instance with hard-coded credentials.
  */
-const KEY = '***REMOVED***'
-const BASE = 'http://***REMOVED***:59888'
-const USER = 'dsh-mem0-test'
+const KEY = process.env.MEM0_API_KEY ?? ''
+const BASE = process.env.MEM0_BASE_URL ?? ''
+const USER = process.env.MEM0_TEST_USER ?? 'dsh-mem0-test'
+
+if (!KEY || !BASE) {
+  console.error('refusing to run: set MEM0_API_KEY and MEM0_BASE_URL first (see AGENTS.md)')
+  process.exit(1)
+}
 
 import('../lib/mem0-client.js').then(async ({ Mem0Client }) => {
   const client = new Mem0Client(() => ({ baseUrl: BASE, apiKey: KEY, authType: 'apiKey', timeoutMs: 15000 }))

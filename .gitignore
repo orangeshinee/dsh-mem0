@@ -2,3 +2,9 @@ node_modules/
 .pnpm-store/
 *.log
 .DS_Store
+
+# local secrets — scripts read MEM0_* / MIGRATE_CONFIRM from env; a local
+# .env (or a sample with real values) must never be committed
+.env
+.env.*
+!.env.example
