@@ -30,17 +30,25 @@ function renderMemories(results: Mem0Memory[] | undefined): string {
   return results.map((m, i) => renderMemory(m, i)).join('\n')
 }
 
-/** Resolve identifiers from tool args, falling back to config defaults. */
+/**
+ * Resolve identifiers from tool args, falling back to config defaults.
+ *
+ * `defaultUserId` always applies. `defaultAgentId` applies for writes
+ * (add) so new memories are attributed to the default agent; for queries
+ * (list / search / bulk delete) it is used only when explicitly passed,
+ * otherwise older memories whose agent_id is null would be filtered out.
+ */
 function resolveIds(
   args: { user_id?: string; agent_id?: string; run_id?: string },
   config: () => Mem0Config,
+  opts: { defaultAgent?: boolean } = {},
 ): { user_id?: string; agent_id?: string; run_id?: string } {
   const ids: { user_id?: string; agent_id?: string; run_id?: string } = {}
   const value = config()
   if (args.user_id) ids.user_id = args.user_id
   else if (value.defaultUserId) ids.user_id = value.defaultUserId
   if (args.agent_id) ids.agent_id = args.agent_id
-  else if (value.defaultAgentId) ids.agent_id = value.defaultAgentId
+  else if (opts.defaultAgent && value.defaultAgentId) ids.agent_id = value.defaultAgentId
   if (args.run_id) ids.run_id = args.run_id
   return ids
 }
@@ -151,7 +159,7 @@ export function mem0AddTool(client: Mem0Client, config: () => Mem0Config) {
             : args.messages
         const response = await client.add({
           messages,
-          ...resolveIds(args, config),
+          ...resolveIds(args, config, { defaultAgent: true }),
           ...(args.metadata ? { metadata: args.metadata } : {}),
           ...(args.infer !== undefined ? { infer: args.infer } : {}),
         })
