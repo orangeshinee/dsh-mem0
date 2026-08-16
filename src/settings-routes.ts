@@ -106,7 +106,9 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
 
 /** The redacted wire view of the namespace, or the unavailable shape. */
 function viewOf(ctx: Context): Record<string, unknown> {
-  const settings = ctx.get('settings')
+  // Loose get (strict misses early-activating consumers; requests always run
+  // after the settings provider is up).
+  const settings = ctx.get('settings', false)
   if (settings === undefined) {
     return { status: 'unavailable', writable: false }
   }
@@ -155,7 +157,7 @@ export function makeSettingsRoutes(ctx: Context): WebRoute[] {
           writeJson(res, 405, { error: `method not allowed: ${method}` })
           return
         }
-        const settings = ctx.get('settings')
+        const settings = ctx.get('settings', false)
         if (settings === undefined) {
           writeJson(res, 503, { error: 'settings service is absent in this deployment' })
           return

@@ -118,7 +118,9 @@ export function apply(ctx: Context, config?: Mem0Config): void {
   // settings wire only exposes namespaces on its own allowlist, so the card
   // talks to this plugin-owned route instead. Registered only when a web
   // server is composed (plain CLI mounts just get the tools + prompt section).
-  const webServer = ctx.get('webServer')
+  // Loose get: this plugin activates early (minimal injects), before the
+  // webServer provider's fiber reaches ACTIVE, so a strict lookup misses it.
+  const webServer = ctx.get('webServer', false)
   if (webServer !== undefined) {
     const disposers = makeSettingsRoutes(ctx).map((route) => webServer.register(route))
     ctx.effect(
