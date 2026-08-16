@@ -33,7 +33,7 @@ export const Config: z<Mem0Config> = z.object({
   authType: z
     .union([z.const('apiKey'), z.const('adminKey'), z.const('jwt'), z.const('none')])
     .default('apiKey'),
-  defaultUserId: z.string().default('Tony'),
+  defaultUserId: z.string().default('HeTony'),
   defaultAgentId: z.string().default('dsh-agent'),
   timeoutMs: z.number().default(15000),
   announceToAgent: z.boolean().default(true),
@@ -45,7 +45,7 @@ export const DEFAULT_CONFIG: Required<Mem0Config> = {
   baseUrl: 'http://127.0.0.1:8888',
   apiKey: '',
   authType: 'apiKey',
-  defaultUserId: 'Tony',
+  defaultUserId: 'HeTony',
   defaultAgentId: 'dsh-agent',
   timeoutMs: 15000,
   announceToAgent: true,

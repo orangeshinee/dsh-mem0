@@ -45,7 +45,7 @@ export const MEM0_GUIDANCE =
   '本机已安装 dsh-mem0 插件（自托管 mem0 记忆读写）：通过 dsh-mem0 工具读写自部署的 mem0 REST 服务。' +
   '能力：mem0_add 写入记忆（支持中文，自动以 user_id/agent_id 归类）；mem0_search 语义搜索；mem0_get 读取（按 id 或列表）；' +
   'mem0_update 更新；mem0_delete 删除（批量删除需 confirm: "DELETE ALL"）；mem0_history 查看历史；mem0_reset 清空（需 confirm: "RESET" 与 admin）；' +
-  'mem0_status 健康检查。服务地址与 API key 在设置面板（插件配置 dsh-mem0）中配置，默认 user_id=Tony / agent_id=dsh-agent。' +
+  'mem0_status 健康检查。服务地址与 API key 在设置面板（插件配置 dsh-mem0）中配置，默认 user_id=HeTony / agent_id=dsh-agent。' +
   '注意：mem0 服务端默认会把中文事实翻译成英文存储，因此中文语义搜索可能命中率低——中文 query 无结果或结果差时，尝试用英文关键词或英文复述再搜。' +
   '限制：删除/清空为破坏性操作，执行前先展示目标并取得用户确认；apiKey 不会被输出。' +
   '用户提到「mem0 / 记忆 / 记住 / 写入记忆 / 搜索记忆 / 读取记忆 / 删除记忆 / 清空记忆」时即指本插件，请据此协作。'

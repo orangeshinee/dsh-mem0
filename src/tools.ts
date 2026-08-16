@@ -337,7 +337,7 @@ export function mem0UpdateTool(client: Mem0Client) {
           metadata: args.metadata,
           expiration_date: args.expiration_date,
         })
-        return { ok: true, message: typeof response === 'object' && response && 'message' in response ? String((response as { message: unknown }).message) : undefined }
+        return { ok: true, message: typeof response === 'object' && response && 'message' in response ? String((response as { message: unknown }).message) ?? '' : '' }
       } catch (error) {
         return failure(error)
       }
@@ -384,7 +384,7 @@ export function mem0DeleteTool(client: Mem0Client, config: () => Mem0Config) {
       try {
         if (args.id) {
           const response = await client.remove(args.id)
-          return { ok: true, message: response.message }
+          return { ok: true, message: response.message ?? '' }
         }
         if (args.confirm !== 'DELETE ALL') {
           return { ok: false, error: 'bulk delete requires confirm: "DELETE ALL"' }
@@ -394,7 +394,7 @@ export function mem0DeleteTool(client: Mem0Client, config: () => Mem0Config) {
           return { ok: false, error: 'bulk delete requires at least one identifier' }
         }
         const response = await client.removeAll(ids)
-        return { ok: true, message: response.message }
+        return { ok: true, message: response.message ?? '' }
       } catch (error) {
         return failure(error)
       }
@@ -490,7 +490,7 @@ export function mem0ResetTool(client: Mem0Client) {
       }
       try {
         const response = await client.reset()
-        return { ok: true, message: response.message }
+        return { ok: true, message: response.message ?? '' }
       } catch (error) {
         return failure(error)
       }
@@ -540,8 +540,8 @@ export function mem0StatusTool(client: Mem0Client) {
           ok: status.reachable,
           reachable: status.reachable,
           authenticated: status.authenticated,
-          setupStatus: status.setupStatus as { needsSetup?: boolean } | null,
-          authError: status.authError,
+          setupStatus: (status.setupStatus ?? null) as { needsSetup?: boolean } | null,
+          authError: status.authError ?? '',
           ...(status.configure !== undefined ? { configure: status.configure as unknown as JsonValue } : {}),
         }
       } catch (error) {
