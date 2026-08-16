@@ -111,7 +111,8 @@ pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷�
   并连同 `lib/` 一起提交，否则线上跑的是旧码。
 - **可安装性规则（`dsh plugin add`）**：profile 默认 `autoInstallPeers:false`，peerDependencies
   不会被装——**运行时导入的包必须是 `dependencies`**（当前：`@deepseek-ai/dsh-settings`、
-  `schemastery`）；但**凡是 harness bundle 行的包（如 `@deepseek-ai/dsh-tools` 的 `tools`
+  `@deepseek-ai/schemastery`，用 scoped 版而非裸 `schemastery`，后者不在任何全局解析路径上）；
+  但**凡是 harness bundle 行的包（如 `@deepseek-ai/dsh-tools` 的 `tools`
   行）绝不能做依赖**：会被 hoist 进 profile、遮蔽 harness 副本，两份模块产生两个
   `TOOL_RUNTIME_SCHEDULER` Symbol，导致每次工具调用报 "Cannot read properties of undefined
   (reading 'prepare')"。这类包只能 `import type`（tools 定义已改为手写 JSON Schema，零运行时
