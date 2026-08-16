@@ -2,7 +2,8 @@
 
 [中文](README.md) | English
 
-A hot-pluggable dsh plugin for reading and writing memories on a
+A hot-pluggable [dsh](https://github.com/deepseek-ai/deepseek-harness) (DeepSeek
+Harness) plugin for reading and writing memories on a
 [self-hosted mem0](https://github.com/mem0ai/mem0) instance: the host Agent
 talks to your own mem0 REST server directly through the `mem0_*` tools (new
 OSS build, `mem0/mem0-api-server`, dashboard included, `X-API-Key` auth,

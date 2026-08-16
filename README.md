@@ -2,7 +2,7 @@
 
 中文 | [English](README.en.md)
 
-自托管 [mem0](https://github.com/mem0ai/mem0) 记忆读写的 dsh 插件：宿主 Agent 通过
+自托管 [mem0](https://github.com/mem0ai/mem0) 记忆读写的 [dsh](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness）插件：宿主 Agent 通过
 `mem0_*` 工具直接读写你自己的 mem0 REST 服务（新版 OSS 构建，`mem0/mem0-api-server`，
 带 dashboard，`X-API-Key` 认证，端点无 `/v1` 前缀）。
 
