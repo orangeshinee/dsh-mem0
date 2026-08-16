@@ -25,14 +25,22 @@
 ## 安装
 
 ```sh
-# 在 dsh-mem0 目录构建
-pnpm install && pnpm build
+# 方式一：直接从 GitHub 安装（无需发布，推荐给使用者）
+dsh plugin --profile web add github:orangeshinee/dsh-mem0
 
-# 挂载到 web profile（link 方式，本地开发）
+# 方式二：npm 发布后安装（维护者先 npm publish 一次）
+npm publish   # 维护者操作
+dsh plugin --profile web add dsh-mem0
+
+# 方式三：本地开发（link 方式）
 dsh plugin --profile web add link:$(pwd)
 
-# 重启 dsh web 生效
+# 装完重启 dsh web 生效
 ```
+
+运行时依赖（`@deepseek-ai/dsh-settings` / `@deepseek-ai/dsh-tools` / `schemastery`）已列为
+硬依赖，`dsh plugin add` 会随包安装（profile 默认 `autoInstallPeers:false`，peerDependencies
+不会被装）。
 
 ## 配置
 

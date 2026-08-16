@@ -30,11 +30,23 @@ below.
 ## Install
 
 ```sh
-# Build inside the dsh-mem0 directory
-pnpm install && pnpm build
+# Option 1: straight from GitHub (no publish step, recommended for users)
+dsh plugin --profile web add github:orangeshinee/dsh-mem0
 
-# Mount into the web profile (link style, local development)
+# Option 2: from npm after publishing (maintainer runs npm publish once)
+npm publish   # maintainer
+dsh plugin --profile web add dsh-mem0
+
+# Option 3: local development (link style)
 dsh plugin --profile web add link:$(pwd)
+
+# Restart dsh web after installing
+```
+
+The runtime dependencies (`@deepseek-ai/dsh-settings`, `@deepseek-ai/dsh-tools`,
+`schemastery`) are hard dependencies, so `dsh plugin add` installs them with the
+package (profiles default to `autoInstallPeers:false`, so peerDependencies would
+not be installed).
 
 # Restart dsh web to take effect
 ```

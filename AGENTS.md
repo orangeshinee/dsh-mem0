@@ -101,6 +101,10 @@ pnpm smoke:apply    # 宿主 apply 冒烟：8 工具 + 提示段注册（scripts
 
 - **`lib/` 提交进 git**：link 挂载直接跑它，克隆仓库即可用；改 `src/` 后必须 `pnpm build`
   并连同 `lib/` 一起提交，否则线上跑的是旧码。
+- **可安装性规则（`dsh plugin add`）**：profile 默认 `autoInstallPeers:false`，peerDependencies
+  不会被装——**运行时导入的包必须是 `dependencies`**（当前：`@deepseek-ai/dsh-settings`、
+  `@deepseek-ai/dsh-tools`、`schemastery`），平台 API 尽量 `import type`（对齐 dsh-ssh 的
+  host 半边）。新增运行时导入时保持这条规则，并确认版本在 npm registry 可获取。
 - 工具/路由的注册与释放都挂在 `ctx.effect` 上（可逆副作用），新增面同样处理。
 - 路由文件保持「每路径一个 handler + 方法内分派」的结构（对齐 `dsh-ssh` 的 route 家族）。
 - 提示词文案（`MEM0_GUIDANCE`）是中文，面向模型；改配置默认值时同步改 README 表格。
