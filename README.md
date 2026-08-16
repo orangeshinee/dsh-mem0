@@ -41,7 +41,7 @@ dsh plugin --profile web add link:$(pwd)
 | `baseUrl` | `http://127.0.0.1:8888` | 自部署 mem0 地址（无尾斜杠、无 `/v1`） |
 | `apiKey` | 空 | dashboard「API Keys」创建的 `m0sk_...`，或 legacy `ADMIN_API_KEY`，或 JWT |
 | `authType` | `apiKey` | `apiKey` / `adminKey` / `jwt` / `none` |
-| `defaultUserId` | `dsh-user` | 工具未指定 `user_id` 时的默认归属 |
+| `defaultUserId` | `HeTony` | 工具未指定 `user_id` 时的默认归属 |
 | `defaultAgentId` | `dsh-agent` | 工具未指定 `agent_id` 时的默认归属 |
 | `timeoutMs` | `15000` | 单请求超时 |
 | `announceToAgent` | `true` | 是否向 Agent 宣告插件能力 |
