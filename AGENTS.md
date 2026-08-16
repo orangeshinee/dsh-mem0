@@ -88,8 +88,9 @@ pnpm smoke:routes   # 宿主路由：脱敏 / 字段白名单 / loopback 围栏 
   `migrate-user-id.mjs` 需要 `MEM0_API_KEY` + `MEM0_BASE_URL`（缺失即退出并提示）；
   `migrate-user-id.mjs` 是**重建+删除**的破坏性脚本，还额外要求 `MIGRATE_CONFIRM=yes`
   才执行。本地可用 `.env` 存放这些值（已在 `.gitignore`），**任何密钥都不进 git**。
-- **旧 git 历史（`9cb7536` / `cfc85b8`）里仍有旧 apiKey 与内网地址，视为已泄露**——旧密钥
-  不要复用到别处，尽快在 mem0 dashboard 轮换。
+- **历史密钥已清除**：2026-08 用 `git filter-repo` 重写过全部历史（旧 apiKey 与内网地址
+  已替换为 `***REMOVED***`，reflog/gc 已深度清理）。旧密钥仍视为可能泄露——不要复用到别处，
+  尽快在 mem0 dashboard 轮换。
 - 配置路由是 **loopback-only**（`isLoopbackRequest` 围栏，同源校验）——执行写入的端点不能
   对 LAN 开放。新增路由必须带同样的围栏。
 - 破坏性工具（删除/清空）先展示目标再执行，工具描述里已写明 confirm 要求，别弱化。
