@@ -103,8 +103,11 @@ pnpm smoke:apply    # 宿主 apply 冒烟：8 工具 + 提示段注册（scripts
   并连同 `lib/` 一起提交，否则线上跑的是旧码。
 - **可安装性规则（`dsh plugin add`）**：profile 默认 `autoInstallPeers:false`，peerDependencies
   不会被装——**运行时导入的包必须是 `dependencies`**（当前：`@deepseek-ai/dsh-settings`、
-  `@deepseek-ai/dsh-tools`、`schemastery`），平台 API 尽量 `import type`（对齐 dsh-ssh 的
-  host 半边）。新增运行时导入时保持这条规则，并确认版本在 npm registry 可获取。
+  `schemastery`）；但**凡是 harness bundle 行的包（如 `@deepseek-ai/dsh-tools` 的 `tools`
+  行）绝不能做依赖**：会被 hoist 进 profile、遮蔽 harness 副本，两份模块产生两个
+  `TOOL_RUNTIME_SCHEDULER` Symbol，导致每次工具调用报 "Cannot read properties of undefined
+  (reading 'prepare')"。这类包只能 `import type`（tools 定义已改为手写 JSON Schema，零运行时
+  导入）。新增运行时导入时保持这条规则，并确认版本在 npm registry 可获取。
 - 工具/路由的注册与释放都挂在 `ctx.effect` 上（可逆副作用），新增面同样处理。
 - 路由文件保持「每路径一个 handler + 方法内分派」的结构（对齐 `dsh-ssh` 的 route 家族）。
 - 提示词文案（`MEM0_GUIDANCE`）是中文，面向模型；改配置默认值时同步改 README 表格。
