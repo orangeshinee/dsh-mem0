@@ -1,0 +1,90 @@
+# Release automation for dsh-mem0.
+#
+# Trigger: push a `v*` tag, e.g.
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# The tag version MUST equal package.json "version" (checked in CI).
+#
+# Pipeline: frozen install -> pnpm build (tsc -> lib/) -> offline smoke tests ->
+# lib/ freshness guard (AGENTS.md rule: lib/ is committed) -> npm pack ->
+# [optional] npm publish (only when the NPM_TOKEN secret is set) ->
+# GitHub Release with the packed tarball + auto release notes.
+#
+# Why a tarball asset: `dsh plugin add github:...` installs by git clone (the
+# committed lib/), not by release assets, but the tarball doubles as an
+# artifact of record and a fallback install source (dsh plugin add <tgz-url>).
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm (version read from packageManager field)
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (tsc -> lib/)
+        run: pnpm build
+
+      - name: Offline smoke tests
+        run: |
+          pnpm smoke:client
+          pnpm smoke:routes
+          pnpm smoke:apply
+          pnpm smoke:tools
+
+      - name: Enforce lib/ freshness (AGENTS.md rule)
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::working tree dirty after build — run 'pnpm build' locally and commit the lib/ changes before tagging"
+            git status --porcelain
+            exit 1
+          fi
+
+      - name: Check tag version matches package.json
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          pkg_version="$(node -p "require('./package.json').version")"
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "::error::tag '${GITHUB_REF_NAME}' does not match package.json version '${pkg_version}' — expected tag 'v${pkg_version}'"
+            exit 1
+          fi
+
+      - name: Pack plugin tarball (npm pack respects the files list)
+        run: npm pack --json > pack-result.json
+
+      - name: Publish to npm (optional — only runs when the NPM_TOKEN secret is set)
+        if: env.NPM_TOKEN != ''
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm config set //registry.npmjs.org/:_authToken "${NPM_TOKEN}"
+          tarball="$(node -p "JSON.parse(require('fs').readFileSync('pack-result.json','utf8'))[0].filename")"
+          npm publish "${tarball}" --no-git-checks
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: dsh-mem0-*.tgz

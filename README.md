@@ -28,6 +28,9 @@
 # 方式一：直接从 GitHub 安装（无需发布，推荐给使用者）
 dsh plugin --profile web add github:orangeshinee/dsh-mem0
 
+# 方式一（指定版本）：对应 GitHub Releases 的 v* 标签，CI 自动打包
+dsh plugin --profile web add github:orangeshinee/dsh-mem0#v0.1.0
+
 # 方式二：npm 发布后安装（维护者先 npm publish 一次）
 npm publish   # 维护者操作
 dsh plugin --profile web add dsh-mem0
@@ -37,6 +40,19 @@ dsh plugin --profile web add link:$(pwd)
 
 # 装完重启 dsh web 生效
 ```
+
+## 发布
+
+打 `v*` 标签即触发 CI（`.github/workflows/release.yml`）自动构建并发布 GitHub Release：
+`pnpm build` → 四项离线冒烟 → `npm pack` 产物（`dsh-mem0-<version>.tgz`）挂到 Release，
+并自动生成 changelog。
+
+```sh
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+标签版本必须与 `package.json` 的 `version` 一致（不一致 CI 会失败）；若仓库设置了
+`NPM_TOKEN` secret，还会同步 `npm publish` 到 npm（未设置则跳过，不影响 Release）。
 
 运行时依赖（`@deepseek-ai/dsh-settings` / `@deepseek-ai/dsh-tools` / `schemastery`）已列为
 硬依赖，`dsh plugin add` 会随包安装（profile 默认 `autoInstallPeers:false`，peerDependencies

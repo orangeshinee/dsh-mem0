@@ -33,6 +33,9 @@ below.
 # Option 1: straight from GitHub (no publish step, recommended for users)
 dsh plugin --profile web add github:orangeshinee/dsh-mem0
 
+# Option 1 (pinned version): v* tag on GitHub Releases, built by CI
+dsh plugin --profile web add github:orangeshinee/dsh-mem0#v0.1.0
+
 # Option 2: from npm after publishing (maintainer runs npm publish once)
 npm publish   # maintainer
 dsh plugin --profile web add dsh-mem0
@@ -48,8 +51,21 @@ The runtime dependencies (`@deepseek-ai/dsh-settings`, `@deepseek-ai/dsh-tools`,
 package (profiles default to `autoInstallPeers:false`, so peerDependencies would
 not be installed).
 
-# Restart dsh web to take effect
+## Release
+
+Pushing a `v*` tag triggers CI (`.github/workflows/release.yml`) to build and
+publish a GitHub Release automatically: `pnpm build` → four offline smoke tests
+→ the `npm pack` artifact (`dsh-mem0-<version>.tgz`) is attached to the
+Release, with auto-generated changelog.
+
+```sh
+git tag v0.1.0 && git push origin v0.1.0
 ```
+
+The tag version must equal the `version` in `package.json` (CI fails
+otherwise). If the repository has an `NPM_TOKEN` secret set, the same run also
+publishes to npm (`npm publish`); without it that step is skipped and the
+GitHub Release still happens.
 
 ## Configuration
 

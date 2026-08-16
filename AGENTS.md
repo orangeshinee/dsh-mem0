@@ -40,6 +40,17 @@ pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷�
 - 冒烟测试用假对象/VM，不碰真实 mem0 数据；`scripts/smoke.mjs` 才打真实实例（用独立
   `dsh-mem0-test` 用户并自清理）。
 
+## 发布（Release）
+
+- 打 `v*` 标签触发 `.github/workflows/release.yml`：`pnpm build` → 四项离线冒烟 →
+  lib/ 新鲜度守卫（构建后工作树必须干净）→ 标签版本必须等于 `package.json` 的
+  `version` → `npm pack` 产物挂 GitHub Release；设置了 `NPM_TOKEN` secret 时同步
+  `npm publish`（未设置则跳过）。
+- 流程：先 `git push` main（确保 lib/ 是最新），再 `git tag v0.1.0 && git push origin
+  v0.1.0`。标签版本与 package.json 不一致会在 CI 失败。
+- 使用者可装指定版本：`dsh plugin add github:orangeshinee/dsh-mem0#v0.1.0`（dsh 对
+  git 源是 clone 整个仓库 + 跑 prepare 脚本；本插件无 prepare、lib/ 已入库，clone 即用）。
+
 ## 架构：两个半边 + 一条路由
 
 - **宿主半边**（`src/`）注册设置命名空间（`installSettingsSection`）、8 个工具、系统提示段。
