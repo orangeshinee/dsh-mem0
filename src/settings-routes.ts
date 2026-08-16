@@ -90,12 +90,19 @@ function writeJson(res: ServerResponse, status: number, body: unknown): void {
 async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown> | undefined> {
   const chunks: Buffer[] = []
   let size = 0
+  let overflow = false
   for await (const chunk of req) {
     const buffer = chunk as Buffer
     size += buffer.length
-    if (size > MAX_JSON_BODY_BYTES) return undefined
+    if (size > MAX_JSON_BODY_BYTES) {
+      // Keep draining the request stream so the keep-alive connection can be
+      // safely reused, but drop the oversized payload.
+      overflow = true
+      continue
+    }
     chunks.push(buffer)
   }
+  if (overflow) return undefined
   try {
     const parsed: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
     return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : undefined

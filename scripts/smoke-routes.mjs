@@ -135,6 +135,17 @@ const settings = fakeSettings()
   assert.equal(s3.calls.length, 0)
 }
 
+// Oversized body (beyond MAX_JSON_BODY_BYTES) -> 400; the stream is drained,
+// so the fake exchange's async iterator is fully consumed.
+{
+  const s4 = fakeSettings()
+  const { run } = fakeExchange(s4, { method: 'POST', body: { set: { baseUrl: 'x'.repeat(40000) } } })
+  const { status, payload } = await run()
+  assert.equal(status, 400)
+  assert.match(payload.error, /invalid JSON body/)
+  assert.equal(s4.calls.length, 0, 'oversized body writes nothing')
+}
+
 // ---------------------------------------------------------------- fence
 
 // Non-loopback is refused.

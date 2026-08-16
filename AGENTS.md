@@ -30,6 +30,7 @@ web 设置面板提供配置卡片。**硬约束：不修改 dsh/harness 源码*
 pnpm build          # tsc 输出 lib/ + 类型检查（必须通过）
 pnpm smoke:client   # 浏览器半边：bundle 加载 + 表单暂存/保存/放弃
 pnpm smoke:routes   # 宿主路由：脱敏 / 字段白名单 / loopback 围栏 / set+unset
+pnpm smoke:apply    # 宿主 apply 冒烟：8 工具 + 提示段注册（scripts/load-test.mjs）
 ```
 
 - 改了 `src/**` → `pnpm build`，且 **dsh web 进程要重启**才生效（宿主代码启动时加载）。
