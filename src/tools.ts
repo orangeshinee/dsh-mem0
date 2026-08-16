@@ -244,7 +244,8 @@ export function mem0GetTool(client: Mem0Client, config: () => Mem0Config) {
     name: 'mem0_get',
     description:
       'Read memories from the self-hosted mem0. With id, returns that one memory; without id, lists memories ' +
-      'scoped to user_id / agent_id / run_id (defaults from plugin config). Listing without any identifier requires admin on the server. ' +
+      'scoped to user_id / agent_id / run_id (defaults from plugin config). Set all=true to list every memory ' +
+      'across identifiers (including agent-only memories with no user_id; requires admin on the server). ' +
       'Triggers: 读取记忆 / 查看记忆 / get memory / list memories from mem0.',
     parameters: {
       id: { type: 'string', description: 'A specific memory id (from mem0_search / mem0_get).' },
@@ -252,6 +253,7 @@ export function mem0GetTool(client: Mem0Client, config: () => Mem0Config) {
       agent_id: { type: 'string', description: 'Scope; defaults to plugin defaultAgentId.' },
       run_id: { type: 'string', description: 'Run-scoped identifier.' },
       top_k: { type: 'integer', description: 'Max rows when listing (server cap 1000).' },
+      all: { type: 'boolean', description: 'List all memories across identifiers (no default scoping; admin required).' },
     },
     output: {
       schema: {
@@ -292,13 +294,16 @@ export function mem0GetTool(client: Mem0Client, config: () => Mem0Config) {
             : `mem0_get failed: ${value.error ?? 'unknown error'}`,
         ),
     },
-    async execute(args: { id?: string; user_id?: string; agent_id?: string; run_id?: string; top_k?: number }) {
+    async execute(args: { id?: string; user_id?: string; agent_id?: string; run_id?: string; top_k?: number; all?: boolean }) {
       try {
         if (args.id) {
           const memory = await client.get(args.id)
           return { ok: true, memory: memory as unknown as JsonValue }
         }
-        const response = await client.list({ ...resolveIds(args, config), top_k: args.top_k })
+        const response =
+          args.all === true
+            ? await client.list({ top_k: args.top_k })
+            : await client.list({ ...resolveIds(args, config), top_k: args.top_k })
         const results = response.results ?? []
         return { ok: true, count: results.length, results: results.map((m) => asJson(m)) }
       } catch (error) {
