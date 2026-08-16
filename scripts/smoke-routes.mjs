@@ -10,7 +10,7 @@ import assert from 'node:assert/strict'
 const { makeSettingsRoutes, CONFIG_ROUTE } = await import('../lib/settings-routes.js')
 
 /** A fake settings service exposing just what the route touches. */
-function fakeSettings(initialUser = { baseUrl: 'http://***REMOVED***:59888', apiKey: 'm0sk_secret' }) {
+function fakeSettings(initialUser = { baseUrl: 'http://192.0.2.1:59888', apiKey: 'm0sk_secret' }) {
   const calls = []
   const state = { user: { ...initialUser } }
   return {
@@ -88,7 +88,7 @@ const settings = fakeSettings()
   assert.equal(status, 200)
   assert.equal(payload.status, 'ready')
   assert.equal(payload.apiKeyConfigured, true)
-  assert.equal(payload.value.baseUrl, 'http://***REMOVED***:59888')
+  assert.equal(payload.value.baseUrl, 'http://192.0.2.1:59888')
   assert.equal('apiKey' in payload.value, false, 'apiKey literal is redacted')
   assert.equal('apiKey' in payload.user, false, 'apiKey literal is redacted from the user layer')
   assert.equal(payload.writable, true)

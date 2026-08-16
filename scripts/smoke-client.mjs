@@ -179,10 +179,10 @@ assert.equal(state0.apiKey.configured, false, 'blank apiKey reports unconfigured
 // ---------------------------------------------------------------- form model
 
 // Stage an edit and verify the draft + override mark.
-card.edit('baseUrl', 'http://***REMOVED***:59888')
+card.edit('baseUrl', 'http://192.0.2.1:59888')
 const state1 = card.useMem0Card((s) => s)
 assert.equal(state1.dirty, true)
-assert.equal(state1.baseUrl.text, 'http://***REMOVED***:59888')
+assert.equal(state1.baseUrl.text, 'http://192.0.2.1:59888')
 assert.equal(state1.baseUrl.overridden, true)
 
 // Typing the same value back is not dirty.
