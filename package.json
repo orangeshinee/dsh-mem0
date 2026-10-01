@@ -1,7 +1,7 @@
 {
   "name": "dsh-mem0",
   "description": "Self-hosted mem0 memory operations for dsh: agent tools (mem0_add / mem0_search / mem0_get / mem0_update / mem0_delete / mem0_history / mem0_reset / mem0_status) against your own mem0 REST server (new OSS build, X-API-Key auth, no /v1 prefix). Hot-pluggable — mounted via `dsh plugin --profile <name> add link:<path>`, no dsh source changes.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"

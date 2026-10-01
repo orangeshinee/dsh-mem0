@@ -48,7 +48,7 @@ The available sources:
 dsh plugin --profile desktop add github:orangeshinee/dsh-mem0
 
 # Option 1 (pinned version): v* tag on GitHub Releases, built by CI
-dsh plugin --profile desktop add github:orangeshinee/dsh-mem0#v0.2.0
+dsh plugin --profile desktop add github:orangeshinee/dsh-mem0#v0.2.1
 
 # Option 2: from npm after publishing (maintainer runs npm publish once)
 npm publish   # maintainer
@@ -74,7 +74,7 @@ publish a GitHub Release automatically: `pnpm build` → four offline smoke test
 Release, with auto-generated changelog.
 
 ```sh
-git tag v0.2.0 && git push origin v0.2.0
+git tag v0.2.1 && git push origin v0.2.1
 ```
 
 The tag version must equal the `version` in `package.json` (CI fails

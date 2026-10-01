@@ -42,7 +42,7 @@ dsh plugin --profile web add link:/path/to/dsh-mem0
 dsh plugin --profile desktop add github:orangeshinee/dsh-mem0
 
 # 方式一（指定版本）：对应 GitHub Releases 的 v* 标签，CI 自动打包
-dsh plugin --profile desktop add github:orangeshinee/dsh-mem0#v0.2.0
+dsh plugin --profile desktop add github:orangeshinee/dsh-mem0#v0.2.1
 
 # 方式二：npm 发布后安装（维护者先 npm publish 一次）
 npm publish   # 维护者操作
@@ -65,7 +65,7 @@ dsh plugin --profile desktop add link:$(pwd)
 并自动生成 changelog。
 
 ```sh
-git tag v0.2.0 && git push origin v0.2.0
+git tag v0.2.1 && git push origin v0.2.1
 ```
 
 标签版本必须与 `package.json` 的 `version` 一致（不一致 CI 会失败）；若仓库设置了
