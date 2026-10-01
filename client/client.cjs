@@ -1,9 +1,10 @@
 /**
  * dsh-mem0 — browser half.
  *
- * Registers the "dsh-mem0" configuration card into the Web settings panel:
- * 设置面板 → 插件 → 插件配置 (the official `settings.plugin.item` slot,
- * rendered by the ui-settings-plugins "configurable" tab).
+ * Registers the "dsh-mem0" configuration page into the Web settings panel:
+ * 设置 → 插件 → dsh-mem0 行 → 配置 (the `plugins.row.config` keyed slot
+ * declared by @deepseek-ai/dsh-client-ui-settings-plugins, keyed
+ * `<package name>#<row id>`).
  *
  * The card does NOT use the harness settings RPC: that wire only exposes
  * namespaces on the harness's own allowlist, which a plugin cannot widen.
@@ -36,6 +37,9 @@ window.__ModuleLoader__.load({
 
     /** Settings namespace this card edits (spelled, not imported — a client bundle must not depend on a Host package). */
     const NS = 'dsh-mem0'
+
+    /** Bundle package name, half of the `plugins.row.config` key. */
+    const PKG = 'dsh-mem0'
 
     /** The plugin-owned config route (mirrors CONFIG_ROUTE in src/settings-routes.ts). */
     const CONFIG_ROUTE = '/api/dsh-mem0/config'
@@ -658,6 +662,9 @@ window.__ModuleLoader__.load({
     /** The dsh-mem0 configuration card. */
     function Mem0Card(props) {
       const { t } = props
+      // The Plugins page asks for `summary` when the row's own page has no
+      // package description to show; the config page itself gets `page`.
+      if (props.view === 'summary') return t('description')
       const state = props.useMem0Card((snapshot) => snapshot)
       const [open, setOpen] = React.useState(false)
       if (!state.available) return null
@@ -828,13 +835,13 @@ window.__ModuleLoader__.load({
         )
         ctx.effect(
           () =>
-            ctx.slots.inject('settings.plugin.item', () =>
+            ctx.slots.inject('plugins.row.config', () =>
               ctx.slots.register(
                 {
-                  name: 'settings.plugin.item',
-                  // Keyed slot: `key` is the settings namespace this card edits;
-                  // the configurable-plugins tab pairs namespace -> card by it.
-                  key: NS,
+                  name: 'plugins.row.config',
+                  // Keyed `<bundle package name>#<row id>`; the Plugins page grows a
+                  // 「配置」 control on that row only while this entry exists.
+                  key: `${PKG}#${NS}`,
                   order: 100,
                   locale: NS,
                   inject: () => controller.inject(),

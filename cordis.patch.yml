@@ -1,13 +1,19 @@
-# dsh-mem0 bundle patch: inserts the host-side plugin row into the web
-# profile roster. Applied as a profile bundle layer (the `dsh.bundle.patch`
-# manifest field) over dsh-base; activate with
-#   dsh plugin --profile web add link:<path-to-this-package>
+# dsh-mem0 bundle patch: inserts the host-side plugin row into the profile
+# roster. Applied as a profile bundle layer (the `dsh.bundle.patch` manifest
+# field) over dsh-base; activate with
+#   dsh plugin --profile <name> add link:<path-to-this-package>
+# Use the profile you actually run — the desktop GUI runs `desktop`.
 #
 # The row is a bare plugin by package name: the node half (exports ".") runs
 # in the host process (mem0 REST client + agent tools + settings section +
 # the /api/dsh-mem0/config route family). The `dsh.client` declaration in
 # package.json makes the browser half (exports "./client", served at
-# /plugins/dsh-mem0/client.js) load in the web GUI — the settings card.
+# /plugins/dsh-mem0/client.js) load in the Web GUI — the configuration page.
+#
+# The row `id` is `dsh-mem0`, not `mem0`, and must equal the settings namespace
+# (src/config.ts) and half of the browser half's `plugins.row.config` key
+# (`<package name>#<row id>`). All of them must agree, or the Plugins page
+# never grows the 「配置」 control and the configuration silently disappears.
 - insert:
-    - id: mem0
+    - id: dsh-mem0
       name: 'dsh-mem0'
