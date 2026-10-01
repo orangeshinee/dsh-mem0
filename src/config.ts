@@ -22,7 +22,14 @@ export const MEM0_SETTINGS_NAMESPACE = 'dsh-mem0'
  */
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 
-/** Resolved runtime config (schema defaults applied by the loader). */
+/**
+ * Resolved runtime config (plain values, defaults applied).
+ *
+ * This is the *resolved* shape — what tools and the REST client consume.
+ * The raw object handed to `apply` differs: every `.volatile()` field arrives
+ * as a `Volatile<T>` reference, so it is typed `RawMem0Config` below and run
+ * through `resolveConfig` (which unwraps the references) before use.
+ */
 export interface Mem0Config {
   /** Base URL of the self-hosted mem0 REST server (no trailing slash, no /v1). */
   baseUrl?: string
@@ -81,17 +88,53 @@ export const DEFAULT_CONFIG: Required<Mem0Config> = {
   enabled: true,
 }
 
-/** Normalize a partial config against the defaults. */
-export function resolveConfig(input: Mem0Config | undefined): Required<Mem0Config> {
-  const value = input ?? {}
+/**
+ * Unwrap one volatile field.
+ *
+ * A `.volatile()` schema field does not hand `apply` a bare value: schemastery
+ * types it `Volatile<T>`, a stable reference exposing `get()`. Reading the
+ * field directly therefore yields a reference object, which is how
+ * `(config.baseUrl ?? '').replace` came to throw "replace is not a function".
+ * Non-volatile shapes (plain values, e.g. hand-built test contexts or a
+ * future schema without `.volatile()`) pass through untouched.
+ */
+function unwrap<T>(field: T | VolatileLike<T> | undefined): T | undefined {
+  if (field === undefined || field === null) return undefined
+  const ref = field as VolatileLike<T>
+  if (typeof ref.get === 'function') {
+    const value = ref.get()
+    return value === null ? undefined : value
+  }
+  return field as T
+}
+
+/** Structural stand-in for schemastery's `Volatile<T>` (declared locally: the type lives in cosmokit, a bundle-row package). */
+interface VolatileLike<T> {
+  get(): T
+}
+
+/**
+ * The config object `apply` actually receives.
+ *
+ * Every `.volatile()` field is a reference rather than a value, and the
+ * runtime legitimately hands either shape (a hand-built test context passes
+ * plain values), so each field admits both and `resolveConfig` unwraps it.
+ */
+export type RawMem0Config = {
+  [K in keyof Mem0Config]?: Mem0Config[K] | VolatileLike<Mem0Config[K]>
+}
+
+/** Normalize a raw config (volatile references unwrapped) against the defaults. */
+export function resolveConfig(input: RawMem0Config | undefined): Required<Mem0Config> {
+  const value = (input ?? {}) as RawMem0Config
   return {
-    baseUrl: value.baseUrl ?? DEFAULT_CONFIG.baseUrl,
-    apiKey: value.apiKey ?? DEFAULT_CONFIG.apiKey,
-    authType: value.authType ?? DEFAULT_CONFIG.authType,
-    defaultUserId: value.defaultUserId ?? DEFAULT_CONFIG.defaultUserId,
-    defaultAgentId: value.defaultAgentId ?? DEFAULT_CONFIG.defaultAgentId,
-    timeoutMs: value.timeoutMs ?? DEFAULT_CONFIG.timeoutMs,
-    announceToAgent: value.announceToAgent ?? DEFAULT_CONFIG.announceToAgent,
-    enabled: value.enabled ?? DEFAULT_CONFIG.enabled,
+    baseUrl: unwrap(value.baseUrl) ?? DEFAULT_CONFIG.baseUrl,
+    apiKey: unwrap(value.apiKey) ?? DEFAULT_CONFIG.apiKey,
+    authType: unwrap(value.authType) ?? DEFAULT_CONFIG.authType,
+    defaultUserId: unwrap(value.defaultUserId) ?? DEFAULT_CONFIG.defaultUserId,
+    defaultAgentId: unwrap(value.defaultAgentId) ?? DEFAULT_CONFIG.defaultAgentId,
+    timeoutMs: unwrap(value.timeoutMs) ?? DEFAULT_CONFIG.timeoutMs,
+    announceToAgent: unwrap(value.announceToAgent) ?? DEFAULT_CONFIG.announceToAgent,
+    enabled: unwrap(value.enabled) ?? DEFAULT_CONFIG.enabled,
   }
 }

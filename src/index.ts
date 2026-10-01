@@ -12,7 +12,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
-import { Config, MEM0_SETTINGS_NAMESPACE, resolveConfig, type Mem0Config } from './config.js'
+import { Config, MEM0_SETTINGS_NAMESPACE, resolveConfig, type Mem0Config, type RawMem0Config } from './config.js'
 import { Mem0Client } from './mem0-client.js'
 import { makeSettingsRoutes, type WebRoute } from './settings-routes.js'
 import {
@@ -60,12 +60,14 @@ export const MEM0_GUIDANCE =
 /**
  * Mount the mem0 client, tools, and announcement.
  * @param ctx - host plugin context carrying tools/systemPrompt.
- * @param config - resolved plugin config (schema defaults applied by the loader).
+ * @param config - raw plugin config. Every `.volatile()` field arrives as a
+ *   `Volatile<T>` reference (not a bare value), which `resolveConfig` unwraps.
  */
-export function apply(ctx: Context, config?: Mem0Config): void {
+export function apply(ctx: Context, config?: RawMem0Config): void {
   // The live source the surfaces read: the settings section once the web
-  // settings surface is served, the composition entry otherwise.
-  let current: () => Mem0Config = () => config ?? {}
+  // settings surface is served, the composition entry otherwise. Held in its
+  // raw shape (volatile references included) and unwrapped by `resolve`.
+  let current: () => RawMem0Config = () => config ?? {}
   const resolve = (): Mem0Config => resolveConfig(current())
 
   // The client reads the live config on every request, so settings edits

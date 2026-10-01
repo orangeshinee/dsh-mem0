@@ -63,3 +63,46 @@ if (missing.length > 0) { console.error('MISSING:', missing.join(', ')); process
 if (sections.length !== 1 || sections[0].name !== 'plugin:dsh-mem0') { console.error('section mismatch'); process.exit(1) }
 if (registeredRoutes.length !== 1 || registeredRoutes[0] !== 'exact /api/dsh-mem0/config') { console.error('route mismatch'); process.exit(1) }
 console.log('OK: all 8 tools + announcement section registered')
+
+// --- volatile reference shape -----------------------------------------------
+// A `.volatile()` schema field does not hand apply() a bare value: schemastery
+// types it `Volatile<T>`, a reference exposing get(). Passing plain strings
+// here (as the block above does) hides that entirely, which is how
+// `(config.baseUrl ?? '').replace` shipped and threw "replace is not a
+// function" at the first real tool call. Exercise the real shape.
+const { resolveConfig } = await import('../lib/config.js')
+
+const ref = (value) => ({ get: () => value })
+const resolved = resolveConfig({
+  baseUrl: ref('http://mem0.internal:8888'),
+  apiKey: ref('m0sk_secret'),
+  authType: ref('jwt'),
+  defaultUserId: ref('Tony'),
+  defaultAgentId: ref('dsh-agent'),
+  timeoutMs: ref(2500),
+  announceToAgent: ref(false),
+  enabled: ref(true),
+})
+for (const [key, want] of Object.entries({
+  baseUrl: 'http://mem0.internal:8888',
+  apiKey: 'm0sk_secret',
+  authType: 'jwt',
+  defaultUserId: 'Tony',
+  defaultAgentId: 'dsh-agent',
+  timeoutMs: 2500,
+  announceToAgent: false,
+  enabled: true,
+})) {
+  if (resolved[key] !== want) {
+    console.error(`volatile unwrap: ${key} = ${JSON.stringify(resolved[key])}, want ${JSON.stringify(want)}`)
+    process.exit(1)
+  }
+}
+// A reference resolving to an absent value must still fall back to the default,
+// and plain values must keep working (hand-built contexts pass them directly).
+if (resolved.baseUrl !== 'http://mem0.internal:8888') { console.error('volatile baseUrl not unwrapped'); process.exit(1) }
+const fallback = resolveConfig({ baseUrl: ref(undefined), timeoutMs: 15000, enabled: true })
+if (fallback.baseUrl !== 'http://127.0.0.1:8888') { console.error('undefined ref did not fall back'); process.exit(1) }
+const plain = resolveConfig({ baseUrl: 'http://plain:1234', timeoutMs: 15000, enabled: true })
+if (plain.baseUrl !== 'http://plain:1234') { console.error('plain value broke'); process.exit(1) }
+console.log('OK: volatile config references unwrap (and plain values still pass through)')

@@ -20,7 +20,14 @@ export declare const MEM0_SETTINGS_NAMESPACE = "dsh-mem0";
 export type JsonValue = string | number | boolean | null | JsonValue[] | {
     [key: string]: JsonValue;
 };
-/** Resolved runtime config (schema defaults applied by the loader). */
+/**
+ * Resolved runtime config (plain values, defaults applied).
+ *
+ * This is the *resolved* shape — what tools and the REST client consume.
+ * The raw object handed to `apply` differs: every `.volatile()` field arrives
+ * as a `Volatile<T>` reference, so it is typed `RawMem0Config` below and run
+ * through `resolveConfig` (which unwraps the references) before use.
+ */
 export interface Mem0Config {
     /** Base URL of the self-hosted mem0 REST server (no trailing slash, no /v1). */
     baseUrl?: string;
@@ -68,5 +75,20 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
 }>>, "plain">;
 /** Schema defaults, re-read for hand-built test contexts (the loader applies them normally). */
 export declare const DEFAULT_CONFIG: Required<Mem0Config>;
-/** Normalize a partial config against the defaults. */
-export declare function resolveConfig(input: Mem0Config | undefined): Required<Mem0Config>;
+/** Structural stand-in for schemastery's `Volatile<T>` (declared locally: the type lives in cosmokit, a bundle-row package). */
+interface VolatileLike<T> {
+    get(): T;
+}
+/**
+ * The config object `apply` actually receives.
+ *
+ * Every `.volatile()` field is a reference rather than a value, and the
+ * runtime legitimately hands either shape (a hand-built test context passes
+ * plain values), so each field admits both and `resolveConfig` unwraps it.
+ */
+export type RawMem0Config = {
+    [K in keyof Mem0Config]?: Mem0Config[K] | VolatileLike<Mem0Config[K]>;
+};
+/** Normalize a raw config (volatile references unwrapped) against the defaults. */
+export declare function resolveConfig(input: RawMem0Config | undefined): Required<Mem0Config>;
+export {};

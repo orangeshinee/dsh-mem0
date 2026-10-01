@@ -9,7 +9,7 @@
  * wire only exposes namespaces on its own allowlist).
  */
 import type { Context } from '@deepseek-ai/cordis';
-import { type Mem0Config } from './config.js';
+import { type RawMem0Config } from './config.js';
 /** Stable cordis plugin name. */
 export declare const name = "mem0";
 /** Services required before the mem0 surfaces can mount. */
@@ -27,6 +27,7 @@ export declare const MEM0_GUIDANCE: string;
 /**
  * Mount the mem0 client, tools, and announcement.
  * @param ctx - host plugin context carrying tools/systemPrompt.
- * @param config - resolved plugin config (schema defaults applied by the loader).
+ * @param config - raw plugin config. Every `.volatile()` field arrives as a
+ *   `Volatile<T>` reference (not a bare value), which `resolveConfig` unwraps.
  */
-export declare function apply(ctx: Context, config?: Mem0Config): void;
+export declare function apply(ctx: Context, config?: RawMem0Config): void;
