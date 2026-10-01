@@ -117,6 +117,17 @@ Settings are persisted by the dsh settings provider; changes to `baseUrl` /
 > this is registered. The old `settings.plugin.item` slot used by 0.1.x was
 > removed in 0.2.
 
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| Installed, but **no `mem0_*` tools at all** | Usually the wrong profile. The desktop GUI runs `desktop`, not `web`: check with `dsh plugin --profile desktop list`. Installing into the wrong profile fails **completely silently**. Restart dsh afterwards |
+| dsh-mem0 shows up on the Plugins page but there is **no Configure entry** | dsh 0.2 configures plugins through the `plugins.row.config` slot (keyed `<package name>#<row id>`). Make sure the row `id` in `cordis.patch.yml`, the namespace in `src/config.ts` and the key in `client/client.cjs` all agree (they are all `dsh-mem0` here) |
+| A tool call fails with `... .replace is not a function` | dsh 0.2 hands `.volatile()` config fields a `Volatile<T>` reference rather than a bare value, so they must be read with `.get()`. This plugin unwraps them in `resolveConfig`; keep that logic if you touch it |
+| `mem0_status` reports `auth: not authenticated` | No `apiKey` configured. Set the `m0sk_...` key from the dashboard on the configuration page |
+| Tools report a connection failure | Wrong `baseUrl`. Check host and port, and do **not** add a `/v1` prefix (the OSS build has none) |
+| First call times out | The mem0 dependency chain (LLM / embedder) is slow when cold; retry, or raise `timeoutMs` |
+
 ## Development
 
 ```sh

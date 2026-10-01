@@ -149,6 +149,23 @@ pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷�
    - 宿主侧的等价注册动作只剩 `ctx.settings.configure({ auto: true })` + 订阅
      `settings/document-updated` 事件来 re-sync（对应旧 `onChange` / `setSource`）。
    - `role('secret')` 与 `.volatile()` 可叠加，脱敏行为不变。
+   - ⚠️ **`.volatile()` 字段不是裸值，是 `Volatile<T>` 引用对象**，取值必须 `.get()`：
+
+     ```ts
+     interface Volatile<T> { get(): VolatileSnapshot<T> }
+     ```
+
+     所以 `apply(ctx, config)` 拿到的 `config.baseUrl` **不是字符串**。直接当字符串用
+     （`(config.baseUrl ?? '').replace(...)`）会抛
+     `(this.config(...).baseUrl ?? "").replace is not a function` —— 表现为**每次工具调用
+     都失败**，但插件加载、设置面板、冒烟测试全部正常，极难定位。
+     `resolveConfig`（`src/config.ts`）负责解包：按 `typeof field.get === 'function'`
+     判断，裸值原样透传（手搭的测试上下文传的就是裸值）；引用解析为 `undefined` 时回落默认值。
+     类型上也分开：`Mem0Config` 是**已解析的裸值**，`RawMem0Config` 才描述 `apply` 实收形状
+     （字段可能是引用）。别把两者合并，否则 `tsc` 抓不到这类错误。
+
+     > **回归保障**：`smoke:apply` 必须包含用**真实引用形状**（`{ get: () => v }`）的用例。
+     > 传裸值的用例发现不了这个 bug —— 这正是它曾经溜过全部四项冒烟的原因。
 3. **配置卡片的槽位在 0.2 换了名字与语义**，且**不同 profile 装的版本不一样**，必须按版本判断：
    - `web` profile 里装的是 `@deepseek-ai/dsh-client-ui-settings-plugins@0.1.5-rc.2`，
      声明旧的 `settings.plugin.item`（keyed，`key` = 命名空间）；

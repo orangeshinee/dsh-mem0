@@ -103,6 +103,17 @@ git tag v0.2.0 && git push origin v0.2.0
 > 槽位说明：dsh 0.2 的插件配置入口是 `plugins.row.config`（keyed `<包名>#<行 id>`），
 > 注册后该行才会出现「配置」按钮。0.1.x 用的旧槽位 `settings.plugin.item` 在 0.2 已移除。
 
+## 故障排查
+
+| 症状 | 原因与处理 |
+|---|---|
+| 插件装好了，但**没有任何 `mem0_*` 工具** | 多半装错了 profile。桌面版 GUI 跑的是 `desktop`，不是 `web`：用 `dsh plugin --profile desktop list` 核对，装错会**完全静默**。改完 profile 后需重启 dsh |
+| 「插件」页能看到 dsh-mem0，但**没有「配置」入口** | dsh 0.2 的配置入口是 `plugins.row.config` 槽位（keyed `<包名>#<行 id>`）。确认 `cordis.patch.yml` 的行 `id`、`src/config.ts` 的命名空间、`client/client.cjs` 的 key 三处一致（本插件均为 `dsh-mem0`） |
+| 工具调用报 `... .replace is not a function` | dsh 0.2 的 `.volatile()` 配置字段是 `Volatile<T>` 引用对象而非裸值，须 `.get()` 取值。本插件已在 `resolveConfig` 中解包；若自行改动该函数请保留解包逻辑 |
+| `mem0_status` 报 `auth: not authenticated` | 未配 `apiKey`。在配置页填入 dashboard 创建的 `m0sk_...` |
+| 工具报连接失败 | `baseUrl` 不对。确认地址与端口，且**不要**带 `/v1` 前缀（OSS 构建的端点没有该前缀） |
+| 首次调用超时 | mem0 依赖链（LLM / embedder）冷启动较慢，重试即可，或调大 `timeoutMs` |
+
 ## 开发
 
 ```sh
