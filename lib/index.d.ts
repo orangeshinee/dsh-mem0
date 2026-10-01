@@ -16,6 +16,12 @@ export declare const name = "mem0";
 export declare const inject: string[];
 /** Settings namespace of the mem0 capability (the section the web settings surface edits). */
 export { MEM0_SETTINGS_NAMESPACE } from './config.js';
+/**
+ * The plugin's config schema. dsh 0.2's SettingsForms reads `fiber.runtime.Config`
+ * to build the settings form, so this export is what makes the section visible
+ * and editable; fields marked `.volatile()` are the ones that appear.
+ */
+export { Config } from './config.js';
 /** Model-facing announcement: plugin presence, capabilities, and limits. */
 export declare const MEM0_GUIDANCE: string;
 /**

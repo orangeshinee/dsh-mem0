@@ -10,8 +10,8 @@ OSS build, `mem0/mem0-api-server`, dashboard included, `X-API-Key` auth,
 endpoints have no `/v1` prefix).
 
 Mounted via `dsh plugin add link:<this-directory>` — no dsh source changes.
-No sidebar UI, but it does ship a browser half: a `dsh-mem0` configuration
-card in Settings → Plugins → Plugin configuration that edits the settings
+No sidebar UI, but it does ship a browser half: a configuration page at
+**Settings → Plugins → the dsh-mem0 row → Configure** that edits the settings
 below.
 
 ## Tools
@@ -29,27 +29,42 @@ below.
 
 ## Install
 
+First make sure you install into the profile you actually run — **installing
+into the wrong profile means the plugin never loads, silently**. The desktop
+GUI runs the `desktop` profile:
+
+```sh
+# Desktop (Electron GUI): confirm from the profiles path in the process command line
+dsh plugin --profile desktop add link:/path/to/dsh-mem0
+
+# Or the CLI / web profile
+dsh plugin --profile web add link:/path/to/dsh-mem0
+```
+
+The available sources:
+
 ```sh
 # Option 1: straight from GitHub (no publish step, recommended for users)
-dsh plugin --profile web add github:orangeshinee/dsh-mem0
+dsh plugin --profile desktop add github:orangeshinee/dsh-mem0
 
 # Option 1 (pinned version): v* tag on GitHub Releases, built by CI
-dsh plugin --profile web add github:orangeshinee/dsh-mem0#v0.1.2
+dsh plugin --profile desktop add github:orangeshinee/dsh-mem0#v0.2.0
 
 # Option 2: from npm after publishing (maintainer runs npm publish once)
 npm publish   # maintainer
-dsh plugin --profile web add dsh-mem0
+dsh plugin --profile desktop add dsh-mem0
 
 # Option 3: local development (link style)
-dsh plugin --profile web add link:$(pwd)
+dsh plugin --profile desktop add link:$(pwd)
 
-# Restart dsh web after installing
+# Restart dsh after installing
 ```
 
 The runtime dependencies (`@deepseek-ai/dsh-settings`, `@deepseek-ai/schemastery`)
 are hard dependencies, so `dsh plugin add` installs them with the
 package (profiles default to `autoInstallPeers:false`, so peerDependencies would
-not be installed).
+not be installed). When the host runs dsh 0.2's settings service, add
+`@deepseek-ai/dsh-settings@^0.2.0-rc.2` to the same profile as well.
 
 ## Release
 
@@ -59,7 +74,7 @@ publish a GitHub Release automatically: `pnpm build` → four offline smoke test
 Release, with auto-generated changelog.
 
 ```sh
-git tag v0.1.2 && git push origin v0.1.2
+git tag v0.2.0 && git push origin v0.2.0
 ```
 
 The tag version must equal the `version` in `package.json` (CI fails
@@ -69,8 +84,9 @@ GitHub Release still happens.
 
 ## Configuration
 
-Settings → Plugins → Plugin configuration → `dsh-mem0` (or the config
-section of the plugin row in the composition):
+Configuration entry point: **Settings → Plugins → the dsh-mem0 row →
+Configure** (or the config section of the plugin row in the profile's patch
+layer):
 
 | Key | Default | Description |
 |---|---|---|
@@ -86,15 +102,20 @@ section of the plugin row in the composition):
 Settings are persisted by the dsh settings provider; changes to `baseUrl` /
 `apiKey` / the default identifiers apply immediately, no restart needed.
 
-> The configuration card is served by the browser half (`client/client.cjs`)
+> The configuration page is served by the browser half (`client/client.cjs`)
 > and reads/writes the settings through the plugin-owned
 > `/api/dsh-mem0/config` route (`src/settings-routes.ts`) — the harness's
 > settings wire only exposes namespaces on its own allowlist, which a plugin
 > cannot extend. `apiKey` is marked `role('secret')` in the schema: the route
 > only sends a "configured / not configured" flag, the key literal never
 > reaches the browser. After changing host-side code (`src/`) you must
-> `pnpm build` and restart dsh web; a change to `client/client.cjs` alone only
+> `pnpm build` and restart dsh; a change to `client/client.cjs` alone only
 > needs a page refresh.
+>
+> Slot note: dsh 0.2's plugin-configuration entry point is `plugins.row.config`
+> (keyed `<package name>#<row id>`); the row only grows a Configure control once
+> this is registered. The old `settings.plugin.item` slot used by 0.1.x was
+> removed in 0.2.
 
 ## Development
 

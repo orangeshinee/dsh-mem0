@@ -53,10 +53,15 @@ pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷�
 
 ## 架构：两个半边 + 一条路由
 
-- **宿主半边**（`src/`）注册设置命名空间（`installSettingsSection`）、8 个工具、系统提示段。
-  工具经 `resolve()` 每次请求读实时配置 → 设置改动即时生效，无需重启。
-- **浏览器半边**（`client/client.cjs`）只做一件事：在设置面板注册 `settings.plugin.item`
-  卡片。卡片不直接依赖宿主工具，只读写配置。
+- **宿主半边**（`src/`）注册设置段（`ctx.settings.configure` + 导出 `Config`，dsh 0.2 起）、
+  8 个工具、系统提示段。工具经 `resolve()` 每次请求读实时配置 → 设置改动即时生效，无需重启。
+- **浏览器半边**（`client/client.cjs`）只做一件事：注册 `plugins.row.config` 卡片，
+  入口是 **设置 → 插件 → dsh-mem0 行 → 配置**（keyed `dsh-mem0#dsh-mem0`）。
+  卡片不直接依赖宿主工具，只读写配置。
+
+  > 槽位历史：0.1.x 用 `settings.plugin.item`（"插件配置" tab 里的卡片）；0.2.0-rc.2 换成
+  > `plugins.row.config`（"插件"页给单个行加「配置」控件）。两者都 keyed，但 key 语义不同
+  > ——旧的是 settings 命名空间，新的是 `<包名>#<行 id>`。
 - **配置通道**：卡片 → `GET/POST /api/dsh-mem0/config`（宿主路由）→ `ctx.settings` 服务。
   卡片内的 `RouteScope` 实现与官方 `settingsScope` 相同的 `getSnapshot/subscribe/set/unset`
   表面，所以表单模型与官方卡片同构，只是传输层换成了自有路由。
@@ -67,7 +72,7 @@ pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷�
    暴露 `WEB_SETTINGS_NAMESPACES` + 模型提供方 + 产品命名空间；插件**无法**把自己命名空间
    加进去（harness 源码注释明说这是 deferred work）。所以配置卡片不能走 `settings.describe`，
    必须走插件自有的 `/api/dsh-mem0/config` 路由。**不要**试图通过注册命名空间让卡片可见——
-   没用。宿主侧 `installSettingsSection` 照常注册（工具读得到），只是浏览器 RPC 读不到。
+   没用。宿主侧 `installSettingsSection` 照常注册（工具读得到），只是浏览器 RPC 读不到。（dsh 0.2 起注册方式见下方「dsh 0.2 迁移」，`installSettingsSection` 已不存在。）
 2. **`ctx.get` 严格模式会漏**。本插件 `inject` 只有 `['tools','systemPrompt']`，激活很早，
    早于 `webServer`/`settings` 提供者纤维达到 ACTIVE。此时 `ctx.get(name)`（严格）返回
    `undefined`，`ctx.get(name, false)`（loose）才拿得到。路由注册和路由内读 settings 都必须
@@ -122,6 +127,55 @@ pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷�
   `ToolOutputError: output.render failed`）。schema 侧对应
   `score: oneOf:[number, null]`。回归保障：`pnpm smoke:tools`（该用例既验 schema
   **也真正调用 render**，因为 schema 通过而 render 崩也曾是一类漏网 bug）。
+
+## dsh 0.2 迁移（0.1.x → 0.2.0-rc.2）
+
+本插件已适配 dsh **0.2.0-rc.2**。升级时踩到的三处断裂，改动前必读：
+
+1. **版本闸门会直接拒绝加载**。peerDependencies 与运行时大版本不符时，dsh 在 profile 启动
+   时拒掉插件（`dsh plugin --profile web list` 会打出 "incompatible with dsh …"，并提示
+   `allow-version` 豁免）。**不要用豁免绕过**——官方原文警告可能崩溃或数据丢失，且依赖包
+   也得一个个豁免。正确做法是把 `cordis` 升到 `~4.0.4`、`dsh-llm`/`dsh-system-prompt`/
+   `dsh-tools`/`dsh-settings` 升到 `^0.2.0-rc.2`，并且 **profile 里的包也要一起升**
+   （`dsh plugin --profile web add '@deepseek-ai/dsh-settings@^0.2.0-rc.2'`）。
+2. **`installSettingsSection` 已被删除**。0.2 的 `@deepseek-ai/dsh-settings` 只剩
+   `SettingsForms` / `SettingsConflictError` / `redactSecrets`（`SettingsProvider` 改名为
+   `SettingsForms`，`settingsNamespace` / `deepEqualJson` 一并移除）。现在的机制是：
+   - 命名空间 = 插件行的 `id`（`entry.options.id`），所以 `MEM0_SETTINGS_NAMESPACE` 是
+     **普通字符串** `'dsh-mem0'`，不再用 branded 构造；
+   - schema 由 `SettingsForms` 直接读 `fiber.runtime.Config` —— 所以**插件必须导出 `Config`**；
+   - 表单字段靠 **`z.string().volatile()`** 标记（`volatileForm()` 只投影 volatile 字段），
+     没标 `.volatile()` 的字段**根本不会出现在设置面板**；
+   - 宿主侧的等价注册动作只剩 `ctx.settings.configure({ auto: true })` + 订阅
+     `settings/document-updated` 事件来 re-sync（对应旧 `onChange` / `setSource`）。
+   - `role('secret')` 与 `.volatile()` 可叠加，脱敏行为不变。
+3. **配置卡片的槽位在 0.2 换了名字与语义**，且**不同 profile 装的版本不一样**，必须按版本判断：
+   - `web` profile 里装的是 `@deepseek-ai/dsh-client-ui-settings-plugins@0.1.5-rc.2`，
+     声明旧的 `settings.plugin.item`（keyed，`key` = 命名空间）；
+   - **desktop profile（Electron GUI 实际使用的那个）用的是 asar 内置的 0.2.0-rc.2**，
+     该版本**没有** `settings.plugin.item`。插件配置改由「插件」页声明的三个槽位承担：
+     `plugins.item`（list，官方插件卡片）、`plugins.bundle.config`（keyed by 包名）、
+     **`plugins.row.config`（keyed by `<包名>#<行 id>`，本插件用的就是这个）**。
+     注册后该行会出现「配置」控件，打开行自己的页面；`view: 'page'` 用于自带保存控件的表单，
+     `view: 'summary'` 用于行详情页缺包描述时的摘要视图。
+   - 本插件现注册 `key: 'dsh-mem0#dsh-mem0'`，入口是 **设置 → 插件 → dsh-mem0 → 配置**。
+   - 三处标识符仍须一致：`cordis.patch.yml` 行 `id`、`client/client.cjs` 的 `NS`、
+     `src/config.ts` 的 `MEM0_SETTINGS_NAMESPACE`（现均为 `dsh-mem0`）；
+     `plugins.row.config` 的 key 是 `${包名}#${行id}`，两半都取自这些常量。
+   - 改 `client.cjs` 槽位时同步改 `scripts/smoke-client.mjs` 的断言，否则冒烟会红。
+   > 排查教训（两条血泪）：
+   > 1. 判断某个槽位/包是否存在，**asar 和 profile 的 node_modules 都要查**。
+   >    桌面版 UI 在 asar 里，web 的部分 UI 包单独装在 `~/.dsh/profiles/*/node_modules`。
+   >    只搜 asar 会误判「已移除」，只搜 node_modules 会误判「还在」——我两次各错一半。
+   > 2. **务必先确认 GUI 跑的是哪个 profile**（看进程命令行里的 profiles 路径）。
+   >    装错 profile（插件进了 web、GUI 却跑 desktop）会让插件完全不加载，且毫无报错。
+4. **附带**：`JsonValue` 从 `@deepseek-ai/dsh-session` 移到了 `@deepseek-ai/dsh-util-values`，
+   后者属 harness bundle 行、**不能做依赖**（见「约定」）。本插件在 `src/config.ts` 里本地
+   声明该类型（`import type` 零运行时成本）。另外 `.volatile()` 需要 schemastery **~3.18.4**
+   （3.18.1 没有这个方法），升级时注意同步。
+5. **未变、无需改**：`ctx.tools.register`（`ToolDefinition.output.{schema,render}` 已是强制项，
+   本插件早已具备）、`systemPrompt.section({name,order,text})`、webServer 路由契约
+   `{kind,path,handler}`、`settings.describe/update/mutate` 三个方法签名。
 
 ## 安全红线
 

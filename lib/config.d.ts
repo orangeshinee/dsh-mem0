@@ -4,8 +4,22 @@
  * dsh settings provider (no hand-rolled store file needed).
  */
 import z from '@deepseek-ai/schemastery';
-/** Settings namespace of the mem0 capability — the section the settings surface edits. */
-export declare const MEM0_SETTINGS_NAMESPACE: import("@deepseek-ai/dsh-settings").SettingsNamespace;
+/**
+ * Settings namespace of the mem0 capability — the profile entry id the
+ * settings surface edits. dsh 0.2 derives it from the plugin row's `id`
+ * (`entry.options.id`), so it is a plain string here; the branded
+ * `settingsNamespace()` helper was removed in 0.2.0-rc.2.
+ */
+export declare const MEM0_SETTINGS_NAMESPACE = "dsh-mem0";
+/**
+ * Lossless JSON value. dsh 0.2 moved `JsonValue` out of `@deepseek-ai/dsh-session`
+ * into `@deepseek-ai/dsh-util-values`, which rides the harness bundle row — the
+ * installability rule forbids depending on a bundle-row package, so the type is
+ * declared here (it is structural and `import type`-only, i.e. zero runtime cost).
+ */
+export type JsonValue = string | number | boolean | null | JsonValue[] | {
+    [key: string]: JsonValue;
+};
 /** Resolved runtime config (schema defaults applied by the loader). */
 export interface Mem0Config {
     /** Base URL of the self-hosted mem0 REST server (no trailing slash, no /v1). */
@@ -25,8 +39,33 @@ export interface Mem0Config {
     /** Master switch for tools and the prompt section. */
     enabled?: boolean;
 }
-/** Schemastery schema, validated + persisted by the dsh settings provider. */
-export declare const Config: z<Mem0Config>;
+/**
+ * Schemastery schema, validated + persisted by the dsh settings provider.
+ *
+ * No `z<Mem0Config>` annotation: `.volatile()` widens each field's output type
+ * to `Volatile<T>`, which cannot satisfy `Mem0Config`. Inference is what the
+ * harness's own plugins use for volatile Config schemas, and `resolveConfig`
+ * below still normalizes whatever the loader hands `apply` into `Mem0Config`.
+ */
+export declare const Config: z<Schemastery.ObjectS<NoInfer<{
+    baseUrl: z<string, string, "volatile-defined">;
+    apiKey: z<string, string, "volatile-defined">;
+    authType: z<"apiKey" | "adminKey" | "jwt" | "none", "apiKey" | "adminKey" | "jwt" | "none", "volatile-defined">;
+    defaultUserId: z<string, string, "volatile-defined">;
+    defaultAgentId: z<string, string, "volatile-defined">;
+    timeoutMs: z<number, number, "volatile-defined">;
+    announceToAgent: z<boolean, boolean, "volatile-defined">;
+    enabled: z<boolean, boolean, "volatile-defined">;
+}>>, Schemastery.ObjectT<NoInfer<{
+    baseUrl: z<string, string, "volatile-defined">;
+    apiKey: z<string, string, "volatile-defined">;
+    authType: z<"apiKey" | "adminKey" | "jwt" | "none", "apiKey" | "adminKey" | "jwt" | "none", "volatile-defined">;
+    defaultUserId: z<string, string, "volatile-defined">;
+    defaultAgentId: z<string, string, "volatile-defined">;
+    timeoutMs: z<number, number, "volatile-defined">;
+    announceToAgent: z<boolean, boolean, "volatile-defined">;
+    enabled: z<boolean, boolean, "volatile-defined">;
+}>>, "plain">;
 /** Schema defaults, re-read for hand-built test contexts (the loader applies them normally). */
 export declare const DEFAULT_CONFIG: Required<Mem0Config>;
 /** Normalize a partial config against the defaults. */

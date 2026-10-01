@@ -7,7 +7,7 @@
 带 dashboard，`X-API-Key` 认证，端点无 `/v1` 前缀）。
 
 热插拔：通过 `dsh plugin add link:<本目录>` 挂载，不改 dsh 源码。无侧边栏 UI，但带一个
-浏览器端：在设置面板 → 插件 → 插件配置里提供 `dsh-mem0` 配置卡片（编辑下面的配置项）。
+浏览器端配置页：**设置 → 插件 → dsh-mem0 行 → 「配置」**，可编辑下面的配置项。
 
 ## 工具
 
@@ -24,22 +24,39 @@
 
 ## 安装
 
+先确认你用的是哪个 profile —— **装错 profile 插件完全不会加载，且没有任何报错**。
+桌面版 GUI 跑的是 `desktop`：
+
+```sh
+# 桌面版（Electron GUI）：看进程命令行里的 profiles 路径确认
+dsh plugin --profile desktop add link:/path/to/dsh-mem0
+
+# 或者 CLI/web 版
+dsh plugin --profile web add link:/path/to/dsh-mem0
+```
+
+各安装方式：
+
 ```sh
 # 方式一：直接从 GitHub 安装（无需发布，推荐给使用者）
-dsh plugin --profile web add github:orangeshinee/dsh-mem0
+dsh plugin --profile desktop add github:orangeshinee/dsh-mem0
 
 # 方式一（指定版本）：对应 GitHub Releases 的 v* 标签，CI 自动打包
-dsh plugin --profile web add github:orangeshinee/dsh-mem0#v0.1.2
+dsh plugin --profile desktop add github:orangeshinee/dsh-mem0#v0.2.0
 
 # 方式二：npm 发布后安装（维护者先 npm publish 一次）
 npm publish   # 维护者操作
-dsh plugin --profile web add dsh-mem0
+dsh plugin --profile desktop add dsh-mem0
 
 # 方式三：本地开发（link 方式）
-dsh plugin --profile web add link:$(pwd)
+dsh plugin --profile desktop add link:$(pwd)
 
-# 装完重启 dsh web 生效
+# 装完重启 dsh 生效
 ```
+
+> 宿主端配了 0.2 的 settings 服务时，还需把运行时依赖装进同一个 profile（`dsh plugin add`
+> 会随包安装 `dependencies`，但 profile 里若缺 harness 侧的 `dsh-settings` 需补齐）：
+> `dsh plugin --profile desktop add '@deepseek-ai/dsh-settings@^0.2.0-rc.2'`。
 
 ## 发布
 
@@ -48,7 +65,7 @@ dsh plugin --profile web add link:$(pwd)
 并自动生成 changelog。
 
 ```sh
-git tag v0.1.2 && git push origin v0.1.2
+git tag v0.2.0 && git push origin v0.2.0
 ```
 
 标签版本必须与 `package.json` 的 `version` 一致（不一致 CI 会失败）；若仓库设置了
@@ -60,7 +77,7 @@ git tag v0.1.2 && git push origin v0.1.2
 
 ## 配置
 
-设置面板 → 插件 → 插件配置 → `dsh-mem0`（或插件构成里的 config 段）：
+配置入口：**设置 → 插件 → dsh-mem0 行 → 「配置」**（或在 profile 的 patch 层里写 config 段）：
 
 | 键 | 默认 | 说明 |
 |---|---|---|
@@ -76,12 +93,15 @@ git tag v0.1.2 && git push origin v0.1.2
 配置经 dsh settings provider 持久化；`baseUrl` / `apiKey` / 默认标识符的修改即时生效，
 无需重启。
 
-> 插件配置卡片由浏览器端提供（`client/client.cjs`），通过插件自带的
+> 配置卡片由浏览器端提供（`client/client.cjs`），通过插件自带的
 > `/api/dsh-mem0/config` 路由（`src/settings-routes.ts`）读写配置——harness 的
 > settings 线上通道只开放白名单内的命名空间，插件无法自行加入。`apiKey` 在 schema 上
 > 标记为 `role('secret')`：路由只下发「已配置/未配置」标记，密钥字面量不会进入浏览器。
-> 修改宿主端代码（`src/`）后需重新 `pnpm build` 并重启 dsh web；仅改 `client/client.cjs`
+> 修改宿主端代码（`src/`）后需重新 `pnpm build` 并重启 dsh；仅改 `client/client.cjs`
 > 刷新页面即可。
+>
+> 槽位说明：dsh 0.2 的插件配置入口是 `plugins.row.config`（keyed `<包名>#<行 id>`），
+> 注册后该行才会出现「配置」按钮。0.1.x 用的旧槽位 `settings.plugin.item` 在 0.2 已移除。
 
 ## 开发
 
