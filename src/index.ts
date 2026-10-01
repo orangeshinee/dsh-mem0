@@ -10,7 +10,6 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection } from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import { Config, MEM0_SETTINGS_NAMESPACE, resolveConfig, type Mem0Config } from './config.js'
@@ -35,6 +34,13 @@ export const inject = ['tools', 'systemPrompt']
 
 /** Settings namespace of the mem0 capability (the section the web settings surface edits). */
 export { MEM0_SETTINGS_NAMESPACE } from './config.js'
+
+/**
+ * The plugin's config schema. dsh 0.2's SettingsForms reads `fiber.runtime.Config`
+ * to build the settings form, so this export is what makes the section visible
+ * and editable; fields marked `.volatile()` are the ones that appear.
+ */
+export { Config } from './config.js'
 
 /** Order of the announcement section within the tool-guidance band. */
 const SECTION_ORDER = 150
@@ -106,12 +112,28 @@ export function apply(ctx: Context, config?: Mem0Config): void {
     }, 'dsh-mem0: tools')
   }
 
-  installSettingsSection(ctx, MEM0_SETTINGS_NAMESPACE, Config, config ?? {}, {
-    setSource: (source) => {
-      current = source
-      sync()
-    },
-    onChange: sync,
+  // dsh 0.2: `installSettingsSection` was removed from @deepseek-ai/dsh-settings
+  // (only SettingsForms / SettingsConflictError / redactSecrets remain). The
+  // namespace now comes from the plugin row's own `id` and its `Config` schema,
+  // which SettingsForms reads directly, so all that is left to register is the
+  // per-instance page policy plus a change subscription that re-syncs the
+  // tools when the saved config moves.
+  ctx.inject(['settings'], (sctx) => {
+    // Loose get: a strict `get` can miss in early-activating or headless
+    // mounts (see AGENTS.md), and `settings` is not in this plugin's `inject`
+    // list, so property access would throw. Absent service ⇒ nothing to do.
+    const settings = sctx.get('settings', false) as
+      | { configure(policy: { auto?: boolean }): () => void }
+      | undefined
+    if (settings === undefined) return
+    sctx.effect(() => settings.configure({ auto: true }), 'dsh-mem0: settings presentation')
+    sctx.effect(
+      () =>
+        sctx.on('settings/document-updated', (ns: unknown, _revision: unknown) => {
+          if (String(ns) === MEM0_SETTINGS_NAMESPACE) sync()
+        }),
+      'dsh-mem0: settings subscription',
+    )
   })
 
   // /api/dsh-mem0/config — the settings card's read/write path. The harness
@@ -137,6 +159,6 @@ export function apply(ctx: Context, config?: Mem0Config): void {
   })
 
   // Initial registration from the composition entry (covers deployments with
-  // no settings service, whose installSettingsSection never fires its hooks).
+  // no settings service, where no document-updated event ever arrives).
   sync()
 }

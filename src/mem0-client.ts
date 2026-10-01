@@ -22,8 +22,7 @@
  * header. Errors surface as {@link Mem0ApiError} with the server's detail.
  */
 
-import type { JsonValue } from '@deepseek-ai/dsh-session'
-import type { Mem0Config } from './config.js'
+import type { JsonValue, Mem0Config } from './config.js'
 
 /** One chat-style message fed to `POST /memories`. */
 export interface Mem0Message {

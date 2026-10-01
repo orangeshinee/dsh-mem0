@@ -16,8 +16,7 @@
 
 import type { JsonSchemaNode, ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { JsonValue } from '@deepseek-ai/dsh-session'
-import type { Mem0Config } from './config.js'
+import type { JsonValue, Mem0Config } from './config.js'
 import type { Mem0Client, Mem0HistoryEntry, Mem0Memory } from './mem0-client.js'
 
 /** One text content block (the only render shape these tools emit). */
