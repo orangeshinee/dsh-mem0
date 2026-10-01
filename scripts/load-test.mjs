@@ -64,6 +64,31 @@ if (sections.length !== 1 || sections[0].name !== 'plugin:dsh-mem0') { console.e
 if (registeredRoutes.length !== 1 || registeredRoutes[0] !== 'exact /api/dsh-mem0/config') { console.error('route mismatch'); process.exit(1) }
 console.log('OK: all 8 tools + announcement section registered')
 
+// --- announcement completeness ----------------------------------------------
+// MEM0_GUIDANCE is a long `+`-joined literal chain. One missing `+` lets ASI
+// end the statement early, silently dropping every later fragment — the
+// announcement still "works", it is just short. That happened: the chain was
+// cut at "agent_id=dsh-agent；" and the all=true / scoped-search / Chinese-query
+// / confirm-before-delete guidance never reached the model. Assert on the
+// phrases themselves, not on length, so a dropped fragment fails loudly.
+const { MEM0_GUIDANCE } = await import('../lib/index.js')
+const required = [
+  'mem0_add', 'mem0_search', 'mem0_get', 'mem0_update',
+  'mem0_delete', 'mem0_history', 'mem0_reset', 'mem0_status',
+  'all=true',               // cross-identifier listing
+  '按标识符范围搜索',          // scoped search is mandatory server-side
+  '英文关键词',              // fallback when a Chinese query misses
+  '取得用户确认',             // destructive ops must be confirmed first
+  'apiKey 不会被输出',        // secret never leaves the host
+]
+const dropped = required.filter((phrase) => !MEM0_GUIDANCE.includes(phrase))
+if (dropped.length > 0) {
+  console.error(`announcement is truncated — missing: ${dropped.join(', ')}`)
+  console.error('(a missing `+` between literal fragments lets ASI end the statement early)')
+  process.exit(1)
+}
+console.log(`OK: announcement carries all ${required.length} required phrases (${MEM0_GUIDANCE.length} chars)`)
+
 // --- volatile reference shape -----------------------------------------------
 // A `.volatile()` schema field does not hand apply() a bare value: schemastery
 // types it `Volatile<T>`, a reference exposing get(). Passing plain strings
