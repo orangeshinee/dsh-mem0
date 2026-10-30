@@ -128,9 +128,9 @@ pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷�
   `score: oneOf:[number, null]`。回归保障：`pnpm smoke:tools`（该用例既验 schema
   **也真正调用 render**，因为 schema 通过而 render 崩也曾是一类漏网 bug）。
 
-## dsh 0.2 迁移（0.1.x → 0.2.0-rc.2）
+## dsh 0.2 迁移（0.1.x → 0.2.0-rc.2 → 0.2.1-rc.3）
 
-本插件已适配 dsh **0.2.0-rc.2**。升级时踩到的三处断裂，改动前必读：
+本插件已适配 dsh **0.2.1-rc.3**（同时保留 0.2.0-rc.2 的迁移结论）。升级时踩到的断裂，改动前必读：
 
 1. **版本闸门会直接拒绝加载**。peerDependencies 与运行时大版本不符时，dsh 在 profile 启动
    时拒掉插件（`dsh plugin --profile web list` 会打出 "incompatible with dsh …"，并提示
@@ -146,8 +146,11 @@ pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷�
    - schema 由 `SettingsForms` 直接读 `fiber.runtime.Config` —— 所以**插件必须导出 `Config`**；
    - 表单字段靠 **`z.string().volatile()`** 标记（`volatileForm()` 只投影 volatile 字段），
      没标 `.volatile()` 的字段**根本不会出现在设置面板**；
-   - 宿主侧的等价注册动作只剩 `ctx.settings.configure({ auto: true })` + 订阅
-     `settings/document-updated` 事件来 re-sync（对应旧 `onChange` / `setSource`）。
+   - 宿主侧的等价注册动作只剩 `ctx.settings.configure({ auto: false }, ctx.fiber)` + 订阅
+     `settings/document-updated` 事件来 re-sync（对应旧 `onChange` / `setSource`）。**自带页面
+     的插件必须传 `auto: false`，并显式传插件自己的 `ctx.fiber`**：`configure` 的 owner 默认是
+     settings 服务自己的 fiber，省略会把页面策略挂到错误的 fiber 上（`describe()` 按
+     `entry.fiber` 查策略）。
    - `role('secret')` 与 `.volatile()` 可叠加，脱敏行为不变。
    - ⚠️ **`.volatile()` 字段不是裸值，是 `Volatile<T>` 引用对象**，取值必须 `.get()`：
 
@@ -188,11 +191,31 @@ pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷�
    >    装错 profile（插件进了 web、GUI 却跑 desktop）会让插件完全不加载，且毫无报错。
 4. **附带**：`JsonValue` 从 `@deepseek-ai/dsh-session` 移到了 `@deepseek-ai/dsh-util-values`，
    后者属 harness bundle 行、**不能做依赖**（见「约定」）。本插件在 `src/config.ts` 里本地
-   声明该类型（`import type` 零运行时成本）。另外 `.volatile()` 需要 schemastery **~3.18.4**
+   声明该类型（`import type` 零运行时成本）。另外 `.volatile()` 需要 schemastery **~3.18.5**
    （3.18.1 没有这个方法），升级时注意同步。
 5. **未变、无需改**：`ctx.tools.register`（`ToolDefinition.output.{schema,render}` 已是强制项，
    本插件早已具备）、`systemPrompt.section({name,order,text})`、webServer 路由契约
    `{kind,path,handler}`、`settings.describe/update/mutate` 三个方法签名。
+
+## dsh 0.2.1-rc.3 更新（2026-10）
+
+Electron 桌面版实际加载的 harness 从 0.2.0-rc.2 升到 **0.2.1-rc.3**（`dsh` CLI 自身的
+`--version` 可能仍是旧版，以 `app.asar/dsh/package.json` 为准）。这次只踩到两处：
+
+1. **prerelease 的 peer 范围不跨补丁位**。`^0.2.0-rc.2` **不接受** `0.2.1-rc.3`（semver
+   规定 prerelease 只有在同一 `major.minor.patch` 且范围本身含 prerelease 时才匹配），
+   于是兼容性闸门 `evaluatePluginCompatibility` 直接把插件判为 incompatible。peerDependencies
+   要写成 `^0.2.1-rc.3`（会自动接受 0.2.1-rc.4/rc.5 与 0.2.1 正式版）。
+2. **桌面 profile 被应用升级“修复”后不会自动恢复插件**。修复会重写
+   `~/.dsh/profiles/desktop/package.json` 与 `cordis.patch.yml`，把 `dsh-mem0` 从
+   `dsh.profile.bundles` 和 patch 行里删掉（`dependencies` 里的 `link:` 会保留），结果是
+   **插件完全不加载、没有 `mem0_*` 工具、也没有配置卡片，且没有报错**。用
+   `install_bundle`（或 GUI 插件页）重新装回当前 profile 即可；旧值可从
+   `~/.dsh/settings.yaml.imported` 的 `dsh-mem0:` 段恢复（导入后该文件已重命名，不会二次导入）。
+
+其余宿主/客户端 API 在 0.2.1-rc.3 未变：`settings.describe/update/mutate`、转发到客户端的
+`settings/document-updated` 事件、`tools.register`、`systemPrompt.section`、`webServer.register`、
+`plugins.row.config` 槽位、`ctx.remote.$on`、`createSnapshotStore` 都仍在。
 
 ## 安全红线
 
@@ -213,8 +236,9 @@ pnpm smoke:tools    # 工具输出 schema 冒烟：真实服务器形状载荷�
 - **`lib/` 提交进 git**：link 挂载直接跑它，克隆仓库即可用；改 `src/` 后必须 `pnpm build`
   并连同 `lib/` 一起提交，否则线上跑的是旧码。
 - **可安装性规则（`dsh plugin add`）**：profile 默认 `autoInstallPeers:false`，peerDependencies
-  不会被装——**运行时导入的包必须是 `dependencies`**（当前：`@deepseek-ai/dsh-settings`、
-  `@deepseek-ai/schemastery`，用 scoped 版而非裸 `schemastery`，后者不在任何全局解析路径上）；
+  不会被装——**运行时导入的包必须是 `dependencies`**（当前只有 `@deepseek-ai/schemastery`，
+  用 scoped 版而非裸 `schemastery`，后者不在任何全局解析路径上；`@deepseek-ai/dsh-settings`
+  只做类型引用，放 `devDependencies`）；
   但**凡是 harness bundle 行的包（如 `@deepseek-ai/dsh-tools` 的 `tools`
   行）绝不能做依赖**：会被 hoist 进 profile、遮蔽 harness 副本，两份模块产生两个
   `TOOL_RUNTIME_SCHEDULER` Symbol，导致每次工具调用报 "Cannot read properties of undefined

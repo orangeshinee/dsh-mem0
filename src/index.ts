@@ -125,10 +125,17 @@ export function apply(ctx: Context, config?: RawMem0Config): void {
     // mounts (see AGENTS.md), and `settings` is not in this plugin's `inject`
     // list, so property access would throw. Absent service ⇒ nothing to do.
     const settings = sctx.get('settings', false) as
-      | { configure(policy: { auto?: boolean }): () => void }
+      | { configure(policy: { auto?: boolean }, owner?: unknown): () => void }
       | undefined
     if (settings === undefined) return
-    sctx.effect(() => settings.configure({ auto: true }), 'dsh-mem0: settings presentation')
+    // This plugin ships its own row config page, so it must not also ask
+    // SettingsForms to auto-generate one. Pass the plugin fiber explicitly:
+    // `describe()` looks the policy up by the loader entry's fiber, and the
+    // service's default owner is its own fiber, not this plugin's.
+    sctx.effect(
+      () => settings.configure({ auto: false }, ctx.fiber),
+      'dsh-mem0: settings presentation',
+    )
     sctx.effect(
       () =>
         sctx.on('settings/document-updated', (ns: unknown, _revision: unknown) => {

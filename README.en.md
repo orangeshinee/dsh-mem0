@@ -48,7 +48,7 @@ The available sources:
 dsh plugin --profile desktop add github:orangeshinee/dsh-mem0
 
 # Option 1 (pinned version): v* tag on GitHub Releases, built by CI
-dsh plugin --profile desktop add github:orangeshinee/dsh-mem0#v0.2.1
+dsh plugin --profile desktop add github:orangeshinee/dsh-mem0#v0.2.2
 
 # Option 2: from npm after publishing (maintainer runs npm publish once)
 npm publish   # maintainer
@@ -60,11 +60,11 @@ dsh plugin --profile desktop add link:$(pwd)
 # Restart dsh after installing
 ```
 
-The runtime dependencies (`@deepseek-ai/dsh-settings`, `@deepseek-ai/schemastery`)
-are hard dependencies, so `dsh plugin add` installs them with the
-package (profiles default to `autoInstallPeers:false`, so peerDependencies would
-not be installed). When the host runs dsh 0.2's settings service, add
-`@deepseek-ai/dsh-settings@^0.2.0-rc.2` to the same profile as well.
+`@deepseek-ai/schemastery` is the only runtime dependency, so `dsh plugin add`
+installs it with the package (profiles default to `autoInstallPeers:false`, so
+peerDependencies are not installed). `@deepseek-ai/dsh-settings` is type-only and
+lives in `devDependencies`; the host's own settings service provides it at
+runtime.
 
 ## Release
 
@@ -74,7 +74,7 @@ publish a GitHub Release automatically: `pnpm build` → four offline smoke test
 Release, with auto-generated changelog.
 
 ```sh
-git tag v0.2.1 && git push origin v0.2.1
+git tag v0.2.2 && git push origin v0.2.2
 ```
 
 The tag version must equal the `version` in `package.json` (CI fails
